@@ -1,0 +1,293 @@
+{% extends "layout.html" %}
+{% block content %}
+
+<div class="flex items-center justify-between mb-6">
+  <h1 class="text-2xl font-black">⚽ 試合日程・結果</h1>
+  <span class="text-xs text-gray-500">更新: <span id="last-updated">--</span> JST</span>
+</div>
+
+<!-- タブ -->
+<div class="flex border-b border-gray-700 mb-6 overflow-x-auto">
+  <button class="main-tab tab-active px-5 py-3 text-sm font-bold whitespace-nowrap" data-tab="today">今日の試合</button>
+  <button class="main-tab px-5 py-3 text-sm font-bold text-gray-400 whitespace-nowrap" data-tab="all">全試合</button>
+  <button class="main-tab px-5 py-3 text-sm font-bold text-gray-400 whitespace-nowrap" data-tab="standings">グループ順位表</button>
+  <button class="main-tab px-5 py-3 text-sm font-bold text-gray-400 whitespace-nowrap" data-tab="knockout">決勝トーナメント</button>
+</div>
+
+<!-- 今日の試合 -->
+<div id="tab-today" class="main-tab-content">
+  <div id="today-matches" class="space-y-3">
+    <div class="text-center text-gray-500 py-10">読み込み中...</div>
+  </div>
+</div>
+
+<!-- 全試合 -->
+<div id="tab-all" class="main-tab-content hidden">
+  <div id="filter-bar" class="flex gap-2 mb-4 flex-wrap">
+    <button class="stage-filter-btn active text-xs px-3 py-1.5 rounded-full border border-gray-600 text-gray-300" data-stage="all">全て</button>
+    <button class="stage-filter-btn text-xs px-3 py-1.5 rounded-full border border-gray-700 text-gray-500" data-stage="グループステージ">グループS</button>
+    <button class="stage-filter-btn text-xs px-3 py-1.5 rounded-full border border-gray-700 text-gray-500" data-stage="ラウンド32">R32</button>
+    <button class="stage-filter-btn text-xs px-3 py-1.5 rounded-full border border-gray-700 text-gray-500" data-stage="ラウンド16">R16</button>
+    <button class="stage-filter-btn text-xs px-3 py-1.5 rounded-full border border-gray-700 text-gray-500" data-stage="準々決勝">QF</button>
+    <button class="stage-filter-btn text-xs px-3 py-1.5 rounded-full border border-gray-700 text-gray-500" data-stage="準決勝">SF</button>
+    <button class="stage-filter-btn text-xs px-3 py-1.5 rounded-full border border-gray-700 text-gray-500" data-stage="決勝">決勝</button>
+  </div>
+  <div id="all-matches" class="space-y-2">
+    <div class="text-center text-gray-500 py-10">読み込み中...</div>
+  </div>
+</div>
+
+<!-- グループ順位表 -->
+<div id="tab-standings" class="main-tab-content hidden">
+  <div id="standings-content">
+    <div class="text-center text-gray-500 py-10">読み込み中...</div>
+  </div>
+</div>
+
+<!-- 決勝トーナメント -->
+<div id="tab-knockout" class="main-tab-content hidden">
+  <div id="knockout-content">
+    <div class="text-center text-gray-500 py-10">読み込み中...</div>
+  </div>
+</div>
+
+<style>
+  .match-card { transition: all 0.2s; }
+  .match-card:hover { background: rgba(255,255,255,0.08); }
+  .live-pulse { animation: pulse 1.5s infinite; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+  .stage-filter-btn.active { background: rgba(255,215,0,0.15); border-color: #FFD700; color: #FFD700; }
+</style>
+
+<script>
+let allMatchesData = [];
+let currentFilter = 'all';
+
+// ── タブ切り替え ──────────────────────────────────────────────
+document.querySelectorAll('.main-tab').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.main-tab').forEach(b => { b.classList.remove('tab-active'); b.classList.add('text-gray-400'); });
+    document.querySelectorAll('.main-tab-content').forEach(c => c.classList.add('hidden'));
+    btn.classList.add('tab-active'); btn.classList.remove('text-gray-400');
+    document.getElementById('tab-' + btn.dataset.tab).classList.remove('hidden');
+    if (btn.dataset.tab === 'standings' || btn.dataset.tab === 'knockout') loadStandings();
+  });
+});
+
+document.querySelectorAll('.stage-filter-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.stage-filter-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    currentFilter = btn.dataset.stage;
+    renderAllMatches();
+  });
+});
+
+// ── 試合カード生成 ────────────────────────────────────────────
+function matchCard(m) {
+  const isLive = m.status_raw === 'IN_PLAY' || m.status_raw === 'PAUSED';
+  const isFinished = m.status_raw === 'FINISHED';
+  const hasScore = m.home_score !== null && m.home_score !== undefined;
+
+  let scoreHtml = '';
+  if (hasScore) {
+    const hStyle = m.home_score > m.away_score ? 'text-yellow-400 font-black text-2xl' : m.home_score === m.away_score ? 'text-white font-bold text-2xl' : 'text-gray-400 font-bold text-2xl';
+    const aStyle = m.away_score > m.home_score ? 'text-yellow-400 font-black text-2xl' : m.away_score === m.home_score ? 'text-white font-bold text-2xl' : 'text-gray-400 font-bold text-2xl';
+    scoreHtml = `<span class="${hStyle}">${m.home_score}</span>
+      <span class="text-gray-500 text-lg mx-1">-</span>
+      <span class="${aStyle}">${m.away_score}</span>`;
+    if (m.home_ht !== null && m.home_ht !== undefined && isFinished) {
+      scoreHtml += `<div class="text-xs text-gray-600 text-center">前半 ${m.home_ht}-${m.away_ht}</div>`;
+    }
+  } else {
+    scoreHtml = `<span class="text-gray-500 text-lg">vs</span>`;
+  }
+
+  const statusBadge = isLive
+    ? `<span class="live-pulse text-red-400 text-xs font-bold">${m.status}</span>`
+    : `<span class="text-xs ${isFinished ? 'text-gray-400' : 'text-blue-400'}">${m.status}</span>`;
+
+  const groupLabel = m.group ? m.group.replace('GROUP_', 'G') : '';
+
+  return `<div class="match-card card rounded-xl px-4 py-3 ${isLive ? 'border border-red-500 border-opacity-50' : ''}">
+    <div class="flex items-center justify-between mb-2">
+      <div class="flex items-center gap-2 text-xs text-gray-500">
+        <span>${m.stage}</span>
+        ${groupLabel ? `<span class="text-gray-600">·</span><span>${groupLabel}</span>` : ''}
+      </div>
+      <div class="flex items-center gap-2">
+        ${statusBadge}
+        <span class="text-xs text-gray-500">🕐 ${m.kick_off_jst}</span>
+      </div>
+    </div>
+    <div class="flex items-center justify-between gap-3">
+      <div class="flex-1 text-right font-semibold text-sm">${m.home}</div>
+      <div class="flex flex-col items-center min-w-20">${scoreHtml}</div>
+      <div class="flex-1 text-left font-semibold text-sm">${m.away}</div>
+    </div>
+  </div>`;
+}
+
+// ── 今日の試合レンダリング ────────────────────────────────────
+function renderTodayMatches(matches) {
+  const el = document.getElementById('today-matches');
+  const jstNow = new Date(new Date().getTime() + 9*3600*1000);
+  const today = jstNow.toISOString().slice(0,10);
+
+  // 試合中 → 今日 → 明日
+  const live = matches.filter(m => m.status_raw === 'IN_PLAY' || m.status_raw === 'PAUSED');
+  const todayMatches = matches.filter(m => {
+    return m.kick_off_jst.startsWith(today.slice(5).replace('-','/')) && m.status_raw !== 'IN_PLAY' && m.status_raw !== 'PAUSED';
+  });
+
+  let html = '';
+  if (live.length) {
+    html += `<div class="text-red-400 font-bold text-sm mb-2 live-pulse">🔴 試合中 (${live.length}試合)</div>`;
+    html += live.map(matchCard).join('');
+    html += '<div class="my-4 border-t border-gray-800"></div>';
+  }
+  if (todayMatches.length) {
+    html += `<div class="text-gray-400 font-bold text-sm mb-2">📅 今日の試合</div>`;
+    html += todayMatches.map(matchCard).join('');
+  }
+  if (!live.length && !todayMatches.length) {
+    // 直近の試合を表示
+    const upcoming = matches.filter(m => m.status_raw === 'TIMED' || m.status_raw === 'SCHEDULED').slice(0, 5);
+    const recent = matches.filter(m => m.status_raw === 'FINISHED').slice(-3);
+    if (upcoming.length) {
+      html += `<div class="text-blue-400 font-bold text-sm mb-2">📅 次の試合</div>`;
+      html += upcoming.map(matchCard).join('');
+    }
+    if (recent.length) {
+      html += '<div class="my-4 border-t border-gray-800"></div>';
+      html += `<div class="text-gray-400 font-bold text-sm mb-2">✅ 直近の結果</div>`;
+      html += recent.map(matchCard).join('');
+    }
+    if (!upcoming.length && !recent.length) {
+      html = '<div class="text-center text-gray-500 py-10">試合情報なし</div>';
+    }
+  }
+  el.innerHTML = html;
+}
+
+// ── 全試合レンダリング ────────────────────────────────────────
+function renderAllMatches() {
+  const el = document.getElementById('all-matches');
+  let filtered = currentFilter === 'all' ? allMatchesData : allMatchesData.filter(m => m.stage === currentFilter);
+  if (!filtered.length) {
+    el.innerHTML = '<div class="text-center text-gray-500 py-6">該当する試合なし</div>';
+    return;
+  }
+  // 日付でグループ化
+  const grouped = {};
+  filtered.forEach(m => {
+    const date = m.kick_off_jst.split(' ')[0];
+    if (!grouped[date]) grouped[date] = [];
+    grouped[date].push(m);
+  });
+  let html = '';
+  for (const [date, ms] of Object.entries(grouped)) {
+    html += `<div class="text-xs text-gray-500 font-bold mt-4 mb-2">📅 ${date}</div>`;
+    html += ms.map(matchCard).join('');
+  }
+  el.innerHTML = html;
+}
+
+// ── 順位表レンダリング ────────────────────────────────────────
+async function loadStandings() {
+  const res = await fetch('/api/standings');
+  const d = await res.json();
+  if (d.error || !d.groups) {
+    document.getElementById('standings-content').innerHTML = '<div class="text-center text-gray-500 py-10">順位表データなし（APIキーを設定してください）</div>';
+    document.getElementById('knockout-content').innerHTML = '<div class="text-center text-gray-500 py-10">決勝トーナメントはグループステージ終了後に表示されます</div>';
+    return;
+  }
+
+  let html = '<div class="grid gap-6 md:grid-cols-2">';
+  for (const g of d.groups) {
+    html += `<div class="card rounded-xl overflow-hidden">
+      <div class="bg-green-900 bg-opacity-40 px-4 py-2 font-bold text-sm text-green-300">${g.group}</div>
+      <table class="w-full text-xs">
+        <thead><tr class="text-gray-500 border-b border-gray-800">
+          <th class="text-left px-3 py-2">チーム</th>
+          <th class="px-1 py-2">試</th><th class="px-1 py-2">勝</th>
+          <th class="px-1 py-2">分</th><th class="px-1 py-2">敗</th>
+          <th class="px-1 py-2">得</th><th class="px-1 py-2">失</th>
+          <th class="px-1 py-2">差</th>
+          <th class="px-2 py-2 font-bold text-yellow-400">点</th>
+        </tr></thead>
+        <tbody>`;
+    g.table.forEach((row, i) => {
+      const isQ = i < 2;
+      html += `<tr class="border-b border-gray-800 border-opacity-50 ${isQ ? 'bg-green-900 bg-opacity-10' : ''}">
+        <td class="px-3 py-2 font-semibold flex items-center gap-1">
+          <span class="text-gray-600 w-4">${row.pos}</span>
+          ${isQ ? '<span class="text-green-400 text-xs">▶</span>' : '<span class="w-3"></span>'}
+          ${row.team}
+        </td>
+        <td class="text-center px-1 py-2 text-gray-400">${row.played}</td>
+        <td class="text-center px-1 py-2">${row.won}</td>
+        <td class="text-center px-1 py-2 text-gray-400">${row.draw}</td>
+        <td class="text-center px-1 py-2 text-gray-400">${row.lost}</td>
+        <td class="text-center px-1 py-2">${row.gf}</td>
+        <td class="text-center px-1 py-2 text-gray-400">${row.ga}</td>
+        <td class="text-center px-1 py-2 ${row.gd > 0 ? 'text-green-400' : row.gd < 0 ? 'text-red-400' : 'text-gray-400'}">${row.gd > 0 ? '+' : ''}${row.gd}</td>
+        <td class="text-center px-2 py-2 font-black text-yellow-400">${row.pts}</td>
+      </tr>`;
+    });
+    html += `</tbody></table></div>`;
+  }
+  html += '</div><p class="text-xs text-gray-600 mt-3 text-center">▶ 決勝T進出圏内</p>';
+  document.getElementById('standings-content').innerHTML = html;
+
+  // 決勝トーナメント: knockout matches から生成
+  renderKnockout();
+}
+
+function renderKnockout() {
+  const knockoutStages = ['ラウンド32','ラウンド16','準々決勝','準決勝','3位決定戦','決勝'];
+  let html = '';
+  for (const stage of knockoutStages) {
+    const ms = allMatchesData.filter(m => m.stage === stage);
+    if (!ms.length) continue;
+    html += `<div class="mb-6">
+      <h3 class="text-sm font-bold text-yellow-400 mb-3">${stage}</h3>
+      <div class="space-y-2">${ms.map(matchCard).join('')}</div>
+    </div>`;
+  }
+  if (!html) html = '<div class="text-center text-gray-500 py-10">決勝トーナメントはグループステージ終了後に表示されます</div>';
+  document.getElementById('knockout-content').innerHTML = html;
+}
+
+// ── データ取得 ────────────────────────────────────────────────
+async function loadMatches() {
+  const res = await fetch('/api/matches');
+  const d = await res.json();
+
+  if (d.error === 'API_KEY_NOT_SET') {
+    const msg = '<div class="card rounded-xl p-6 text-center border border-orange-500 border-opacity-30"><p class="text-orange-400 font-bold mb-2">⚠️ APIキー未設定</p><p class="text-gray-400 text-sm">管理者画面でfootball-data.org のAPIキーを登録してください</p></div>';
+    document.getElementById('today-matches').innerHTML = msg;
+    document.getElementById('all-matches').innerHTML = msg;
+    return;
+  }
+  if (d.error || !d.matches) {
+    const msg = '<div class="text-center text-red-400 py-6">データ取得に失敗しました。しばらく待ってから再読み込みしてください。</div>';
+    document.getElementById('today-matches').innerHTML = msg;
+    return;
+  }
+
+  allMatchesData = d.matches;
+  document.getElementById('last-updated').textContent = d.updated_jst;
+
+  renderTodayMatches(d.matches);
+  renderAllMatches();
+  renderKnockout();
+}
+
+// 初期化 & 5分ごと自動更新
+loadMatches();
+loadStandings();
+setInterval(loadMatches, 5 * 60 * 1000);
+</script>
+
+{% endblock %}

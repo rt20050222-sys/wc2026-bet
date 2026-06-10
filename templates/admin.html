@@ -26,6 +26,15 @@
       </div>
     </div>
     <div>
+      <label class="text-sm text-gray-400 mb-1 block">⚽ football-data.org APIキー
+        <a href="https://www.football-data.org/client/register" target="_blank" class="text-blue-400 ml-2 text-xs">無料登録はこちら</a>
+      </label>
+      <input type="text" name="football_api_key" value="{{ football_api_key }}" placeholder="APIキーを貼り付け"
+        class="w-full rounded-lg px-4 py-2 border border-gray-600 text-sm font-mono"
+        style="background:#1e293b; color:white;">
+      <p class="text-xs text-gray-500 mt-1">登録後メールで届くキーを入力すると試合速報・順位表が自動更新されます</p>
+    </div>
+    <div>
       <label class="text-sm text-gray-400 mb-1 block">締め切り日時（空白=無制限）</label>
       <input type="datetime-local" name="deadline"
         value="{{ deadline[:16] if deadline else '' }}"

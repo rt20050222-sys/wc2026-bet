@@ -1,7 +1,9 @@
 import os
 import json
 import uuid
-from datetime import datetime, timezone
+import urllib.request
+import urllib.error
+from datetime import datetime, timezone, timedelta
 from flask import (Flask, render_template, request, jsonify,
                    session, redirect, url_for)
 from flask_sqlalchemy import SQLAlchemy
@@ -13,28 +15,109 @@ app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:////home/rt20050222sys/wc2026_be
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db = SQLAlchemy(app)
 
-# ── チーム一覧 ──────────────────────────────────────────────────
+# ── チーム一覧（2026 W杯 48カ国・正式） ────────────────────────
 TEAMS = [
-    # 南米
-    "アルゼンチン", "ブラジル", "ウルグアイ", "コロンビア", "エクアドル",
-    "ベネズエラ", "ボリビア", "パラグアイ", "チリ", "ペルー",
-    # ヨーロッパ
+    # CONMEBOL（南米 6）
+    "アルゼンチン", "ブラジル", "ウルグアイ", "コロンビア", "エクアドル", "パラグアイ",
+    # UEFA（欧州 16）
     "フランス", "スペイン", "イングランド", "ドイツ", "ポルトガル",
-    "オランダ", "ベルギー", "イタリア", "クロアチア", "デンマーク",
-    "スイス", "オーストリア", "ポーランド", "セルビア", "ハンガリー",
-    "ルーマニア", "チェコ", "スロバキア", "スコットランド", "トルコ",
-    "ウクライナ", "ギリシャ", "アルバニア", "スロベニア",
-    # 北中米カリブ
-    "アメリカ", "メキシコ", "カナダ", "コスタリカ", "パナマ",
-    "ジャマイカ", "ホンジュラス",
-    # アジア
+    "オランダ", "ベルギー", "クロアチア", "スイス", "オーストリア",
+    "チェコ", "スコットランド", "トルコ", "ノルウェー", "スウェーデン",
+    "ボスニア・ヘルツェゴビナ",
+    # CONCACAF（北中米カリブ 6）
+    "アメリカ", "メキシコ", "カナダ", "パナマ", "ハイチ", "キュラソー",
+    # AFC（アジア 9）
     "日本", "韓国", "オーストラリア", "イラン", "サウジアラビア",
-    "ウズベキスタン", "イラク", "ヨルダン",
-    # アフリカ
-    "モロッコ", "セネガル", "ナイジェリア", "コートジボワール",
-    "エジプト", "コンゴ民主共和国", "カメルーン", "南アフリカ",
-    "マリ", "アルジェリア",
+    "ウズベキスタン", "イラク", "ヨルダン", "カタール",
+    # CAF（アフリカ 10）
+    "モロッコ", "セネガル", "コートジボワール", "エジプト",
+    "コンゴ民主共和国", "南アフリカ", "ガーナ", "アルジェリア",
+    "チュニジア", "カーボベルデ",
+    # OFC（オセアニア 1）
+    "ニュージーランド",
 ]
+
+# football-data.org の英語名 → 日本語名マッピング
+TEAM_NAME_MAP = {
+    "Argentina": "アルゼンチン", "Brazil": "ブラジル", "Uruguay": "ウルグアイ",
+    "Colombia": "コロンビア", "Ecuador": "エクアドル", "Paraguay": "パラグアイ",
+    "France": "フランス", "Spain": "スペイン", "England": "イングランド",
+    "Germany": "ドイツ", "Portugal": "ポルトガル", "Netherlands": "オランダ",
+    "Belgium": "ベルギー", "Croatia": "クロアチア", "Switzerland": "スイス",
+    "Austria": "オーストリア", "Czech Republic": "チェコ", "Czechia": "チェコ",
+    "Scotland": "スコットランド", "Turkey": "トルコ", "Norway": "ノルウェー",
+    "Sweden": "スウェーデン", "Bosnia and Herzegovina": "ボスニア・ヘルツェゴビナ",
+    "United States": "アメリカ", "Mexico": "メキシコ", "Canada": "カナダ",
+    "Panama": "パナマ", "Haiti": "ハイチ", "Curaçao": "キュラソー", "Curacao": "キュラソー",
+    "Japan": "日本", "Korea Republic": "韓国", "South Korea": "韓国",
+    "Australia": "オーストラリア", "Iran": "イラン", "Saudi Arabia": "サウジアラビア",
+    "Uzbekistan": "ウズベキスタン", "Iraq": "イラク", "Jordan": "ヨルダン",
+    "Qatar": "カタール",
+    "Morocco": "モロッコ", "Senegal": "セネガル", "Côte d'Ivoire": "コートジボワール",
+    "Ivory Coast": "コートジボワール", "Egypt": "エジプト",
+    "DR Congo": "コンゴ民主共和国", "Democratic Republic of Congo": "コンゴ民主共和国",
+    "South Africa": "南アフリカ", "Ghana": "ガーナ", "Algeria": "アルジェリア",
+    "Tunisia": "チュニジア", "Cape Verde": "カーボベルデ",
+    "New Zealand": "ニュージーランド",
+}
+
+def team_ja(name):
+    return TEAM_NAME_MAP.get(name, name)
+
+# ── 試合データキャッシュ ──────────────────────────────────────────
+_match_cache = {'data': None, 'updated': None}
+_standings_cache = {'data': None, 'updated': None}
+CACHE_MINUTES = 5
+
+def fetch_football_api(path):
+    api_key = get_cfg('football_api_key', '')
+    if not api_key:
+        return None
+    url = f'https://api.football-data.org/v4/{path}'
+    req = urllib.request.Request(url, headers={'X-Auth-Token': api_key})
+    try:
+        with urllib.request.urlopen(req, timeout=10) as res:
+            return json.loads(res.read().decode())
+    except Exception:
+        return None
+
+def get_matches():
+    now = datetime.now(timezone.utc)
+    if (_match_cache['data'] is not None and _match_cache['updated'] and
+            now - _match_cache['updated'] < timedelta(minutes=CACHE_MINUTES)):
+        return _match_cache['data']
+    data = fetch_football_api('competitions/WC/matches')
+    if data:
+        _match_cache['data'] = data
+        _match_cache['updated'] = now
+    return _match_cache['data']
+
+def get_standings():
+    now = datetime.now(timezone.utc)
+    if (_standings_cache['data'] is not None and _standings_cache['updated'] and
+            now - _standings_cache['updated'] < timedelta(minutes=CACHE_MINUTES)):
+        return _standings_cache['data']
+    data = fetch_football_api('competitions/WC/standings')
+    if data:
+        _standings_cache['data'] = data
+        _standings_cache['updated'] = now
+    return _standings_cache['data']
+
+STAGE_LABELS = {
+    'GROUP_STAGE': 'グループステージ',
+    'LAST_32': 'ラウンド32',
+    'LAST_16': 'ラウンド16',
+    'QUARTER_FINALS': '準々決勝',
+    'SEMI_FINALS': '準決勝',
+    'THIRD_PLACE': '3位決定戦',
+    'FINAL': '決勝',
+}
+
+STATUS_LABELS = {
+    'SCHEDULED': '未定', 'TIMED': '開始前',
+    'IN_PLAY': '🔴 試合中', 'PAUSED': '🟡 ハーフタイム',
+    'FINISHED': '終了', 'POSTPONED': '延期', 'CANCELLED': '中止',
+}
 
 # ── モデル ────────────────────────────────────────────────────────
 class Config(db.Model):
@@ -157,6 +240,93 @@ def final_payouts():
                         pay += b.amount * totals['win'] / w_total
         out[p.name] = round(pay)
     return out
+
+# ── 試合・順位ルート ──────────────────────────────────────────────
+@app.route('/matches')
+def matches_page():
+    participant = None
+    if 'token' in session:
+        participant = Participant.query.filter_by(token=session['token']).first()
+    return render_template('matches.html', participant=participant)
+
+@app.route('/api/matches')
+def api_matches():
+    data = get_matches()
+    if not data:
+        api_key = get_cfg('football_api_key', '')
+        if not api_key:
+            return jsonify({'error': 'API_KEY_NOT_SET'})
+        return jsonify({'error': 'FETCH_FAILED'})
+
+    now = datetime.now(timezone.utc)
+    matches = []
+    for m in data.get('matches', []):
+        utc_str = m.get('utcDate', '')
+        try:
+            kick_off = datetime.fromisoformat(utc_str.replace('Z', '+00:00'))
+            jst = kick_off + timedelta(hours=9)
+            kick_off_jst = jst.strftime('%m/%d %H:%M')
+        except Exception:
+            kick_off_jst = utc_str
+            kick_off = None
+
+        status = m.get('status', '')
+        score = m.get('score', {})
+        ft = score.get('fullTime', {})
+        ht = score.get('halfTime', {})
+
+        home = team_ja(m.get('homeTeam', {}).get('name', ''))
+        away = team_ja(m.get('awayTeam', {}).get('name', ''))
+
+        matches.append({
+            'id': m.get('id'),
+            'stage': STAGE_LABELS.get(m.get('stage', ''), m.get('stage', '')),
+            'group': m.get('group', ''),
+            'kick_off_jst': kick_off_jst,
+            'status': STATUS_LABELS.get(status, status),
+            'status_raw': status,
+            'home': home,
+            'away': away,
+            'home_score': ft.get('home'),
+            'away_score': ft.get('away'),
+            'home_ht': ht.get('home'),
+            'away_ht': ht.get('away'),
+        })
+
+    updated = _match_cache['updated']
+    updated_jst = (updated + timedelta(hours=9)).strftime('%H:%M:%S') if updated else '--'
+    return jsonify({'matches': matches, 'updated_jst': updated_jst})
+
+@app.route('/api/standings')
+def api_standings():
+    data = get_standings()
+    if not data:
+        return jsonify({'error': 'NO_DATA'})
+
+    groups = []
+    for s in data.get('standings', []):
+        if s.get('type') != 'TOTAL':
+            continue
+        group_name = s.get('group', '').replace('GROUP_', 'グループ ')
+        table = []
+        for row in s.get('table', []):
+            table.append({
+                'pos': row.get('position'),
+                'team': team_ja(row.get('team', {}).get('name', '')),
+                'played': row.get('playedGames', 0),
+                'won': row.get('won', 0),
+                'draw': row.get('draw', 0),
+                'lost': row.get('lost', 0),
+                'gf': row.get('goalsFor', 0),
+                'ga': row.get('goalsAgainst', 0),
+                'gd': row.get('goalDifference', 0),
+                'pts': row.get('points', 0),
+            })
+        groups.append({'group': group_name, 'table': table})
+
+    updated = _standings_cache['updated']
+    updated_jst = (updated + timedelta(hours=9)).strftime('%H:%M:%S') if updated else '--'
+    return jsonify({'groups': groups, 'updated_jst': updated_jst})
 
 # ── ルート ────────────────────────────────────────────────────────
 @app.route('/')
@@ -284,6 +454,7 @@ def admin():
         if action == 'config':
             set_cfg('buy_in', int(request.form['buy_in']))
             set_cfg('admin_password', request.form['admin_password'])
+            set_cfg('football_api_key', request.form.get('football_api_key', '').strip())
             deadline_str = request.form.get('deadline', '').strip()
             if deadline_str:
                 dt = datetime.fromisoformat(deadline_str).replace(tzinfo=timezone.utc)
@@ -291,6 +462,8 @@ def admin():
             else:
                 set_cfg('deadline', None)
             set_cfg('is_open', request.form.get('is_open') == 'on')
+            _match_cache['data'] = None
+            _standings_cache['data'] = None
 
         elif action == 'results':
             set_cfg('results', {
@@ -322,6 +495,7 @@ def admin():
         participants=participants,
         buy_in=get_cfg('buy_in', 1000),
         admin_password=get_cfg('admin_password', 'admin1234'),
+        football_api_key=get_cfg('football_api_key', ''),
         deadline=get_cfg('deadline', ''),
         is_open=get_cfg('is_open', True),
         totals=totals,
