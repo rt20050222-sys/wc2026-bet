@@ -61,6 +61,14 @@
         <div class="text-gray-600 mt-2">例：フランス5.8×スペイン5.5×日本101 = 3連単 3,220.9pt</div>
       </div>
     </div>
+    <div>
+      <label class="text-sm text-gray-400 mb-1 block">⏱ 第1試合キックオフ時刻（UTC）</label>
+      <input type="datetime-local" name="first_match_time"
+        value="{{ first_match_time }}"
+        class="w-full rounded-lg px-4 py-2 border border-gray-600 text-sm"
+        style="background:#1e293b;color:white;">
+      <p class="text-xs text-gray-500 mt-1">カウントダウンの終点に使用（UTC＝日本時間−9時間）</p>
+    </div>
     <div class="flex items-center gap-3">
       <input type="checkbox" name="is_open" id="is_open" {% if is_open %}checked{% endif %}
         class="w-4 h-4 accent-green-500">
@@ -207,6 +215,31 @@
   <div class="mt-4 text-xs text-gray-500 text-center">
     ポイント: 3連単=15pt / 3連複=5pt / 1チーム=1pt
   </div>
+</div>
+
+<!-- オッズ編集 -->
+<div class="card rounded-2xl p-6 mb-6">
+  <h2 class="text-lg font-bold mb-1">📊 各チームのオッズ編集</h2>
+  <p class="text-xs text-gray-500 mb-4">変更後「オッズを保存」を押してください。ポイント計算にすぐ反映されます。</p>
+  <form action="/admin" method="post">
+    <input type="hidden" name="action" value="update_odds">
+    <div class="grid grid-cols-2 sm:grid-cols-3 gap-2 mb-4">
+      {% for team, default_o in teams_with_odds %}
+      {% set current_o = odds_config.get(team, default_o) %}
+      <div class="card rounded-lg px-3 py-2 flex items-center gap-2">
+        <span class="text-xs text-gray-300 flex-1 truncate">{{ team }}</span>
+        <input type="number" name="odds_{{ team }}"
+          value="{{ current_o }}" min="1" max="9999" step="0.1"
+          class="w-20 text-right rounded px-2 py-1 border border-gray-700 text-xs font-bold"
+          style="background:#1e293b;color:{% if current_o <= 10 %}#FFD700{% elif current_o <= 50 %}#4ade80{% elif current_o <= 200 %}#60a5fa{% else %}#9ca3af{% endif %}">
+        <span class="text-gray-600 text-xs">倍</span>
+      </div>
+      {% endfor %}
+    </div>
+    <button type="submit" class="btn-primary px-8 py-3 rounded-lg font-bold">
+      💾 オッズを保存
+    </button>
+  </form>
 </div>
 
 {% endblock %}

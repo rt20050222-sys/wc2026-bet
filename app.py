@@ -68,11 +68,18 @@ TEAMS_WITH_ODDS = [
     ("キュラソー",    3001.0),
 ]
 
-TEAMS    = [t for t, _ in TEAMS_WITH_ODDS]
-ODDS_MAP = {t: o for t, o in TEAMS_WITH_ODDS}
+TEAMS         = [t for t, _ in TEAMS_WITH_ODDS]
+ODDS_MAP_DEFAULT = {t: o for t, o in TEAMS_WITH_ODDS}
+
+def get_odds_config():
+    """DB保存のオッズを取得（未設定ならデフォルト値）"""
+    stored = get_cfg('team_odds', None)
+    if stored and isinstance(stored, dict):
+        return stored
+    return ODDS_MAP_DEFAULT.copy()
 
 def get_team_odds(name):
-    return ODDS_MAP.get(name, 1.0)
+    return get_odds_config().get(name, 1.0)
 
 # football-data.org の英語名 → 日本語名マッピング
 TEAM_NAME_MAP = {
@@ -134,12 +141,13 @@ WC_HISTORY = [
 ]
 
 def fetch_live_odds():
-    """TEAMS_WITH_ODDS からオッズ一覧を返す"""
-    return {
-        'odds': [{'name': t, 'odds': o} for t, o in TEAMS_WITH_ODDS],
-        'updated_at': '2026-06-11',
-        'source': '参考オッズ',
-    }
+    """DB保存のオッズ一覧を返す（オッズ順ソート）"""
+    cfg = get_odds_config()
+    odds_list = sorted(
+        [{'name': t, 'odds': cfg.get(t, o)} for t, o in TEAMS_WITH_ODDS],
+        key=lambda x: x['odds']
+    )
+    return {'odds': odds_list, 'updated_at': '', 'source': '参考オッズ'}
 
 def fetch_football_api(path):
     api_key = get_cfg('football_api_key', '')
@@ -449,6 +457,7 @@ def index():
         participants=participants,
         buy_in=get_cfg('buy_in', 3000),
         is_open=is_betting_open(),
+        first_match_time=get_cfg('first_match_time', '2026-06-12T02:00'),
         deadline=get_cfg('deadline'),
         results=results,
         payouts=payouts,
@@ -719,8 +728,20 @@ def admin():
             else:
                 set_cfg('deadline', None)
             set_cfg('is_open', request.form.get('is_open') == 'on')
+            set_cfg('first_match_time', request.form.get('first_match_time', '').strip())
             _match_cache['data'] = None
             _standings_cache['data'] = None
+
+        elif action == 'update_odds':
+            new_odds = {}
+            for team, default_odds in TEAMS_WITH_ODDS:
+                raw = request.form.get(f'odds_{team}', '').strip()
+                try:
+                    new_odds[team] = float(raw)
+                except ValueError:
+                    new_odds[team] = default_odds
+            set_cfg('team_odds', new_odds)
+            _odds_cache['data'] = None
 
         elif action == 'results':
             set_cfg('results', {
@@ -757,6 +778,9 @@ def admin():
         football_api_key=get_cfg('football_api_key', ''),
         odds_api_key=get_cfg('odds_api_key', ''),
         deadline=get_cfg('deadline', ''),
+        first_match_time=get_cfg('first_match_time', '2026-06-12T02:00'),
+        odds_config=get_odds_config(),
+        teams_with_odds=TEAMS_WITH_ODDS,
         is_open=get_cfg('is_open', True),
         total_pool=total_pool,
         results=results,
