@@ -233,32 +233,6 @@
   <div class="text-xs text-gray-600 mt-3 text-center" id="last-updated"></div>
 </div>
 
-<!-- 歴代W杯結果 -->
-<div class="card rounded-2xl p-6 mb-6">
-  <div class="flex items-center justify-between mb-4">
-    <h2 class="text-lg font-bold">🏆 歴代W杯優勝国（1930〜2022）</h2>
-    <button onclick="toggleHistory()" id="history-toggle-btn" class="text-xs text-gray-400 hover:text-white">表示する ▼</button>
-  </div>
-  <div id="history-content" class="hidden">
-    <div class="overflow-x-auto">
-      <table class="w-full text-sm" id="history-table">
-        <thead>
-          <tr class="border-b border-gray-700 text-gray-400 text-xs">
-            <th class="text-left py-2 pr-4">年</th>
-            <th class="text-left py-2 pr-4">🥇 優勝</th>
-            <th class="text-left py-2 pr-4">🥈 準優勝</th>
-            <th class="text-left py-2">🥉 3位</th>
-          </tr>
-        </thead>
-        <tbody id="history-tbody">
-          <tr><td colspan="4" class="text-gray-500 text-center py-4">読み込み中...</td></tr>
-        </tbody>
-      </table>
-    </div>
-    <div class="mt-3 text-xs text-gray-600 text-center">計22大会 | 第23回大会 = W杯2026（開催中）</div>
-  </div>
-</div>
-
 <!-- 参加者一覧 -->
 <div class="card rounded-2xl p-6">
   <h2 class="text-lg font-bold mb-4">👥 参加者 (<span id="participant-count">{{ participants | length }}</span>人)</h2>
@@ -590,29 +564,6 @@ async function runSimulation() {
 
   resEl.classList.remove('hidden');
   resEl.scrollIntoView({behavior: 'smooth', block: 'nearest'});
-}
-
-// ── 歴代W杯結果 ──────────────────────────────────────────
-let historyLoaded = false;
-async function toggleHistory() {
-  const content = document.getElementById('history-content');
-  const btn = document.getElementById('history-toggle-btn');
-  const visible = content.classList.toggle('hidden');
-  btn.textContent = visible ? '表示する ▼' : '隠す ▲';
-  if (!visible && !historyLoaded) {
-    const res = await fetch('/api/wc-history');
-    const data = await res.json();
-    // 新しい順に表示
-    const reversed = [...data].reverse();
-    document.getElementById('history-tbody').innerHTML = reversed.map((r, i) => `
-      <tr class="border-b border-gray-800 border-opacity-40 hover:bg-white hover:bg-opacity-5 ${i === 0 ? 'bg-yellow-900 bg-opacity-10' : ''}">
-        <td class="py-2 pr-4 font-bold ${i === 0 ? 'text-yellow-400' : 'text-gray-400'}">${r.year}</td>
-        <td class="py-2 pr-4 font-semibold">${r.first}</td>
-        <td class="py-2 pr-4 text-gray-400">${r.second}</td>
-        <td class="py-2 text-gray-500">${r.third}</td>
-      </tr>`).join('');
-    historyLoaded = true;
-  }
 }
 
 // ── 初期化 ────────────────────────────────────────────────
