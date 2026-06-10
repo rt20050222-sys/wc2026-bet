@@ -471,6 +471,75 @@ def place_bet():
     sc = payout_scenarios(p)
     return jsonify({'ok': True, 'scenarios': sc})
 
+@app.route('/api/simulate', methods=['POST'])
+def simulate():
+    """仮の結果を入力して全員の配当をシミュレーション"""
+    data = request.json
+    r1 = data.get('first', '').strip()
+    r2 = data.get('second', '').strip()
+    r3 = data.get('third', '').strip()
+    if not r1 or not r2 or not r3:
+        return jsonify({'error': '1位・2位・3位をすべて選択してください'}), 400
+    if len({r1, r2, r3}) < 3:
+        return jsonify({'error': '同じチームを選択できません'}), 400
+
+    all_bets = Bet.query.all()
+    total_pool = sum(b.amount for b in all_bets)
+    pts_cfg = get_points()
+
+    # 各参加者のポイントと判定を計算
+    results_list = []
+    for p in Participant.query.order_by(Participant.joined_at).all():
+        if not p.bets:
+            results_list.append({
+                'name': p.name, 'pts': 0, 'payout': 0,
+                'label': '未入力', 'team1': '--', 'team2': '--', 'team3': '--'
+            })
+            continue
+        b = p.bets[0]
+        pts = score_prediction(b, r1, r2, r3)
+
+        # 判定ラベル
+        top3 = {r1, r2, r3}
+        my = [b.team1, b.team2, b.team3]
+        if b.team1 == r1 and b.team2 == r2 and b.team3 == r3:
+            label = f'🥇 3連単 ({pts_cfg["trifecta"]}pt)'
+        elif set(filter(None, my)) == top3:
+            label = f'🎯 3連複 ({pts_cfg["trio"]}pt)'
+        else:
+            hit = sum(1 for t in my if t and t in top3)
+            if hit > 0:
+                label = f'✅ {hit}チーム的中 ({hit * pts_cfg["team"]}pt)'
+            else:
+                label = '❌ ハズレ (0pt)'
+
+        results_list.append({
+            'name': p.name, 'pts': pts,
+            'team1': b.team1, 'team2': b.team2, 'team3': b.team3,
+            'label': label
+        })
+
+    total_pts = sum(r['pts'] for r in results_list)
+
+    # 配当計算（余りなし）
+    for r in results_list:
+        r['payout'] = round(r['pts'] / total_pts * total_pool) if total_pts > 0 else 0
+
+    # 端数調整
+    if total_pts > 0:
+        diff = total_pool - sum(r['payout'] for r in results_list)
+        if diff != 0:
+            top = max(results_list, key=lambda x: x['pts'])
+            top['payout'] += diff
+
+    results_list.sort(key=lambda x: (-x['pts'], x['name']))
+    return jsonify({
+        'results': results_list,
+        'total_pool': total_pool,
+        'total_pts': total_pts,
+        'r1': r1, 'r2': r2, 'r3': r3
+    })
+
 @app.route('/api/stats')
 def get_stats():
     """集計情報（参加者数・プール・3種別ランキング）"""

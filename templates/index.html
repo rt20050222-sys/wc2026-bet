@@ -174,6 +174,47 @@
   <div id="all-bets-content" class="hidden space-y-2"></div>
 </div>
 
+<!-- シミュレーター -->
+<div class="card rounded-2xl p-6 mb-6">
+  <h2 class="text-lg font-bold mb-1">🔮 配当シミュレーター</h2>
+  <p class="text-xs text-gray-500 mb-4">仮の結果を入力すると、今の全員の予想に対してポイントと配当を計算します</p>
+
+  <div class="grid grid-cols-3 gap-3 mb-4">
+    <div>
+      <label class="text-xs text-yellow-400 font-bold mb-1 block">🥇 仮の1位</label>
+      <select id="sim-1st" class="w-full rounded-lg px-3 py-2 border border-gray-600 text-sm" style="background:#1e293b;color:white;">
+        <option value="">選択...</option>
+        {% for t in teams %}<option value="{{ t }}">{{ t }}</option>{% endfor %}
+      </select>
+    </div>
+    <div>
+      <label class="text-xs text-gray-300 font-bold mb-1 block">🥈 仮の2位</label>
+      <select id="sim-2nd" class="w-full rounded-lg px-3 py-2 border border-gray-600 text-sm" style="background:#1e293b;color:white;">
+        <option value="">選択...</option>
+        {% for t in teams %}<option value="{{ t }}">{{ t }}</option>{% endfor %}
+      </select>
+    </div>
+    <div>
+      <label class="text-xs text-orange-400 font-bold mb-1 block">🥉 仮の3位</label>
+      <select id="sim-3rd" class="w-full rounded-lg px-3 py-2 border border-gray-600 text-sm" style="background:#1e293b;color:white;">
+        <option value="">選択...</option>
+        {% for t in teams %}<option value="{{ t }}">{{ t }}</option>{% endfor %}
+      </select>
+    </div>
+  </div>
+
+  <button onclick="runSimulation()" class="w-full py-3 rounded-lg font-bold text-sm mb-4"
+    style="background:linear-gradient(135deg,#7c3aed,#4f46e5)">
+    ⚡ シミュレーション実行
+  </button>
+
+  <div id="sim-result" class="hidden">
+    <div class="text-xs text-gray-500 mb-3" id="sim-summary"></div>
+    <div id="sim-table" class="space-y-2"></div>
+  </div>
+  <div id="sim-error" class="hidden text-red-400 text-sm text-center py-2"></div>
+</div>
+
 <!-- 人気予想ランキング -->
 <div class="card rounded-2xl p-6 mb-6">
   <h2 class="text-lg font-bold mb-4">🔥 人気予想ランキング</h2>
@@ -451,6 +492,78 @@ async function changeName() {
     msg.textContent = '❌ ' + (d.error||'エラー');
     msg.className = 'text-xs mt-2 text-red-400';
   }
+}
+
+// ── シミュレーター ────────────────────────────────────────
+async function runSimulation() {
+  const r1 = document.getElementById('sim-1st').value;
+  const r2 = document.getElementById('sim-2nd').value;
+  const r3 = document.getElementById('sim-3rd').value;
+  const errEl = document.getElementById('sim-error');
+  const resEl = document.getElementById('sim-result');
+
+  errEl.classList.add('hidden');
+  resEl.classList.add('hidden');
+
+  if (!r1 || !r2 || !r3) {
+    errEl.textContent = '⚠️ 1位・2位・3位をすべて選択してください';
+    errEl.classList.remove('hidden');
+    return;
+  }
+  if (new Set([r1,r2,r3]).size < 3) {
+    errEl.textContent = '⚠️ 同じチームを選択できません';
+    errEl.classList.remove('hidden');
+    return;
+  }
+
+  const res = await fetch('/api/simulate', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({first: r1, second: r2, third: r3})
+  });
+  const d = await res.json();
+  if (d.error) {
+    errEl.textContent = '❌ ' + d.error;
+    errEl.classList.remove('hidden');
+    return;
+  }
+
+  // サマリー
+  document.getElementById('sim-summary').innerHTML =
+    `仮の結果: <span class="text-yellow-400 font-bold">🥇${d.r1} → 🥈${d.r2} → 🥉${d.r3}</span>　` +
+    `総プール: <span class="text-green-400 font-bold">${d.total_pool.toLocaleString()}円</span>　` +
+    `合計pt: <span class="text-purple-400 font-bold">${d.total_pts}pt</span>`;
+
+  // テーブル
+  const tableEl = document.getElementById('sim-table');
+  if (!d.results.length) {
+    tableEl.innerHTML = '<div class="text-gray-500 text-sm text-center py-4">参加者なし</div>';
+  } else {
+    tableEl.innerHTML = d.results.map((r, i) => {
+      const rankIcon = i === 0 && r.pts > 0 ? '🥇' : i === 1 && r.pts > 0 ? '🥈' : i === 2 && r.pts > 0 ? '🥉' : '';
+      const pred = r.team1 !== '--'
+        ? `<span class="text-gray-500 text-xs">${r.team1} → ${r.team2} → ${r.team3}</span>`
+        : '<span class="text-gray-700 text-xs">未入力</span>';
+      const payoutColor = r.payout > 0 ? 'text-yellow-400' : 'text-gray-600';
+      const payoutText = r.payout > 0 ? `+${r.payout.toLocaleString()}円` : '0円';
+      return `<div class="card rounded-xl px-4 py-2.5 flex items-center justify-between gap-2 ${r.payout > 0 ? 'border border-yellow-500 border-opacity-20' : ''}">
+        <div class="flex-1 min-w-0">
+          <div class="flex items-center gap-2">
+            <span class="font-semibold text-sm">${rankIcon} ${r.name}</span>
+            <span class="text-xs px-2 py-0.5 rounded-full ${r.pts > 0 ? 'bg-purple-900 text-purple-300' : 'bg-gray-800 text-gray-500'}">${r.label}</span>
+          </div>
+          <div class="mt-0.5">${pred}</div>
+        </div>
+        <div class="text-right shrink-0">
+          <div class="font-black ${payoutColor}">${payoutText}</div>
+          <div class="text-xs text-gray-600">${r.pts}pt</div>
+        </div>
+      </div>`;
+    }).join('');
+  }
+
+  resEl.classList.remove('hidden');
+  resEl.scrollIntoView({behavior: 'smooth', block: 'nearest'});
 }
 
 // ── 初期化 ────────────────────────────────────────────────
