@@ -165,22 +165,28 @@ def is_betting_open():
         return datetime.now(timezone.utc) < datetime.fromisoformat(deadline)
     return True
 
-POINTS = {'trifecta': 15, 'trio': 5, 'team': 1}  # 固定ポイント
+def get_points():
+    """管理者設定のポイントを取得（デフォルト: 3連単=15, 3連複=5, チーム=1）"""
+    return get_cfg('points', {'trifecta': 15, 'trio': 5, 'team': 1})
 
 def score_prediction(b, r1, r2, r3):
     """
     予想bに対してポイントを計算
-    3連単(順番通り)=15pt / 3連複(3チーム正解・順不同)=5pt / 各チーム=1pt
-    ※ 上位ルールが成立したら下位は加算しない
+    3連単(順番通り)   → trifecta pt
+    3連複(3チーム正解・順不同) → trio pt
+    1〜2チーム正解   → team pt × 正解チーム数
+    ※ 3チーム全正解は3連複扱いのためチーム単位ではカウントしない
     """
+    pts = get_points()
     top3 = {r1, r2, r3}
     my = [b.team1, b.team2, b.team3]
 
     if b.team1 == r1 and b.team2 == r2 and b.team3 == r3:
-        return 15  # 3連単
+        return pts['trifecta']              # 3連単
     if set(filter(None, my)) == top3:
-        return 5   # 3連複
-    return sum(1 for t in my if t and t in top3)  # チーム単位（0〜2pt）
+        return pts['trio']                  # 3連複（全3チーム正解・順不同）
+    hit = sum(1 for t in my if t and t in top3)
+    return hit * pts['team']               # 単勝（1〜2チーム正解）
 
 def calc_stats():
     """表示用：予想の集計・重複チェック用"""
@@ -483,7 +489,7 @@ def get_stats():
     trifecta_count = {}
     # 3連複：3チームの組み合わせ（順不同）
     trio_count = {}
-    # 単勝：1位予想チーム
+    # 単勝：予想に含めたチームの人気（全ポジション横断）
     win_count = {}
 
     for b in all_bets:
@@ -493,9 +499,9 @@ def get_stats():
         # 3連複
         trio_key = ' / '.join(sorted(filter(None, [b.team1, b.team2, b.team3])))
         trio_count[trio_key] = trio_count.get(trio_key, 0) + 1
-        # 単勝
-        if b.team1:
-            win_count[b.team1] = win_count.get(b.team1, 0) + 1
+        # 単勝：予想に含めた全チームをカウント（1〜2チーム一致が対象のため全チーム集計）
+        for t in filter(None, [b.team1, b.team2, b.team3]):
+            win_count[t] = win_count.get(t, 0) + 1
 
     def to_list(d):
         return sorted(
@@ -535,6 +541,11 @@ def admin():
             set_cfg('buy_in', int(request.form['buy_in']))
             set_cfg('admin_password', request.form['admin_password'])
             set_cfg('football_api_key', request.form.get('football_api_key', '').strip())
+            set_cfg('points', {
+                'trifecta': int(request.form.get('pt_trifecta', 15)),
+                'trio':     int(request.form.get('pt_trio', 5)),
+                'team':     int(request.form.get('pt_team', 1)),
+            })
             deadline_str = request.form.get('deadline', '').strip()
             if deadline_str:
                 dt = datetime.fromisoformat(deadline_str).replace(tzinfo=timezone.utc)
@@ -578,6 +589,7 @@ def admin():
         buy_in=get_cfg('buy_in', 3000),
         admin_password=get_cfg('admin_password', 'admin1234'),
         football_api_key=get_cfg('football_api_key', ''),
+        points=get_points(),
         deadline=get_cfg('deadline', ''),
         is_open=get_cfg('is_open', True),
         total_pool=total_pool,

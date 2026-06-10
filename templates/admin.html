@@ -42,6 +42,43 @@
         style="background:#1e293b; color:white;">
       <p class="text-xs text-gray-500 mt-1">※ UTC時刻で入力してください（JST - 9時間）</p>
     </div>
+    <!-- ポイント設定 -->
+    <div>
+      <label class="text-sm text-gray-400 mb-2 block">🎯 ポイント設定</label>
+      <div class="grid grid-cols-3 gap-3">
+        <div class="card rounded-lg p-3 text-center">
+          <div class="text-xs text-yellow-400 font-bold mb-1">3連単</div>
+          <div class="text-xs text-gray-500 mb-2">1位〜3位を順番通り的中</div>
+          <div class="flex items-center gap-1 justify-center">
+            <input type="number" name="pt_trifecta" value="{{ points.trifecta }}" min="1" max="999"
+              class="w-16 text-center rounded px-2 py-1 border border-gray-600 text-sm font-bold"
+              style="background:#1e293b;color:white;">
+            <span class="text-xs text-gray-400">pt</span>
+          </div>
+        </div>
+        <div class="card rounded-lg p-3 text-center">
+          <div class="text-xs text-blue-400 font-bold mb-1">3連複</div>
+          <div class="text-xs text-gray-500 mb-2">3チーム全員的中（順不同）</div>
+          <div class="flex items-center gap-1 justify-center">
+            <input type="number" name="pt_trio" value="{{ points.trio }}" min="1" max="999"
+              class="w-16 text-center rounded px-2 py-1 border border-gray-600 text-sm font-bold"
+              style="background:#1e293b;color:white;">
+            <span class="text-xs text-gray-400">pt</span>
+          </div>
+        </div>
+        <div class="card rounded-lg p-3 text-center">
+          <div class="text-xs text-gray-300 font-bold mb-1">単勝（1チームあたり）</div>
+          <div class="text-xs text-gray-500 mb-2">1〜2チーム的中時 ×チーム数</div>
+          <div class="flex items-center gap-1 justify-center">
+            <input type="number" name="pt_team" value="{{ points.team }}" min="1" max="999"
+              class="w-16 text-center rounded px-2 py-1 border border-gray-600 text-sm font-bold"
+              style="background:#1e293b;color:white;">
+            <span class="text-xs text-gray-400">pt</span>
+          </div>
+        </div>
+      </div>
+      <p class="text-xs text-gray-500 mt-2">※3チーム全員的中は3連複として扱われ、単勝にはカウントされません</p>
+    </div>
     <div class="flex items-center gap-3">
       <input type="checkbox" name="is_open" id="is_open" {% if is_open %}checked{% endif %}
         class="w-4 h-4 accent-green-500">
