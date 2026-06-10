@@ -42,6 +42,34 @@
         style="background:#1e293b; color:white;">
       <p class="text-xs text-gray-500 mt-1">※ UTC時刻で入力してください（JST - 9時間）</p>
     </div>
+    <!-- ポイント倍率 -->
+    <div>
+      <label class="text-sm text-gray-400 mb-2 block">🎯 的中ポイント倍率（重み付き按分に使用）</label>
+      <div class="grid grid-cols-3 gap-3">
+        <div class="card rounded-lg p-3 text-center">
+          <div class="text-xs text-yellow-400 mb-1">3連単（最難）</div>
+          <input type="number" name="w_trifecta" value="{{ weights.trifecta }}" min="1" max="100"
+            class="w-full text-center rounded px-2 py-1 border border-gray-600 text-sm font-bold"
+            style="background:#1e293b; color:white;">
+          <div class="text-xs text-gray-500 mt-1">倍</div>
+        </div>
+        <div class="card rounded-lg p-3 text-center">
+          <div class="text-xs text-gray-300 mb-1">3連複（中）</div>
+          <input type="number" name="w_trio" value="{{ weights.trio }}" min="1" max="100"
+            class="w-full text-center rounded px-2 py-1 border border-gray-600 text-sm font-bold"
+            style="background:#1e293b; color:white;">
+          <div class="text-xs text-gray-500 mt-1">倍</div>
+        </div>
+        <div class="card rounded-lg p-3 text-center">
+          <div class="text-xs text-blue-400 mb-1">単勝（易）</div>
+          <input type="number" name="w_win" value="{{ weights.win }}" min="1" max="100"
+            class="w-full text-center rounded px-2 py-1 border border-gray-600 text-sm font-bold"
+            style="background:#1e293b; color:white;">
+          <div class="text-xs text-gray-500 mt-1">倍</div>
+        </div>
+      </div>
+      <p class="text-xs text-gray-500 mt-2">例：3連単3倍・3連複2倍・単勝1倍 → 同じ金額なら3連単的中者は単勝的中者の3倍の報酬</p>
+    </div>
     <div class="flex items-center gap-3">
       <input type="checkbox" name="is_open" id="is_open" {% if is_open %}checked{% endif %}
         class="w-4 h-4 accent-green-500">

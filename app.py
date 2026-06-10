@@ -165,27 +165,32 @@ def is_betting_open():
         return datetime.now(timezone.utc) < datetime.fromisoformat(deadline)
     return True
 
+def get_weights():
+    """賭け種別の難易度ポイント倍率を取得"""
+    return get_cfg('weights', {'trifecta': 3, 'trio': 2, 'win': 1})
+
+def bet_key(b):
+    if b.bet_type == 'trifecta':
+        return f"{b.team1}|{b.team2}|{b.team3}"
+    elif b.bet_type == 'trio':
+        return '|'.join(sorted(filter(None, [b.team1, b.team2, b.team3])))
+    else:
+        return b.team1 or ''
+
 def calc_pools():
-    """各賭け種別のプール・賭け分布を集計"""
+    """表示用：賭け種別ごとのプール集計"""
     bets = Bet.query.all()
     pools  = {'trifecta': {}, 'trio': {}, 'win': {}}
     totals = {'trifecta': 0, 'trio': 0, 'win': 0}
-
     for b in bets:
         bt = b.bet_type
         totals[bt] += b.amount
-        if bt == 'trifecta':
-            key = f"{b.team1}|{b.team2}|{b.team3}"
-        elif bt == 'trio':
-            key = '|'.join(sorted(filter(None, [b.team1, b.team2, b.team3])))
-        else:
-            key = b.team1 or ''
-        pools[bt][key] = pools[bt].get(key, 0) + b.amount
-
+        k = bet_key(b)
+        pools[bt][k] = pools[bt].get(k, 0) + b.amount
     return pools, totals
 
 def odds_for(pools, totals):
-    """パリミュチュエルオッズ計算"""
+    """表示用：パリミュチュエルオッズ"""
     result = {}
     for bt, pool in pools.items():
         result[bt] = {}
@@ -194,51 +199,83 @@ def odds_for(pools, totals):
     return result
 
 def expected_payout(participant):
-    pools, totals = calc_pools()
-    odd = odds_for(pools, totals)
-    total = 0
+    """
+    重み付き按分方式での予想報酬
+    ＝ 自分と同じ組み合わせに賭けた人だけが的中と仮定して計算
+    """
+    weights = get_weights()
+    all_bets = Bet.query.all()
+    total_pool = sum(b.amount for b in all_bets)
+    if total_pool == 0:
+        return 0
+
+    total_expected = 0
     for b in participant.bets:
-        bt = b.bet_type
-        if bt == 'trifecta':
-            key = f"{b.team1}|{b.team2}|{b.team3}"
-        elif bt == 'trio':
-            key = '|'.join(sorted(filter(None, [b.team1, b.team2, b.team3])))
-        else:
-            key = b.team1 or ''
-        if key in odd.get(bt, {}):
-            total += b.amount * odd[bt][key]
-    return round(total)
+        w = weights.get(b.bet_type, 1)
+        my_pts = b.amount * w
+        my_key = bet_key(b)
+
+        # 同じ組み合わせに賭けた全員の加重ポイント合計
+        same_pts = sum(
+            x.amount * weights.get(x.bet_type, 1)
+            for x in all_bets
+            if x.bet_type == b.bet_type and bet_key(x) == my_key
+        )
+        if same_pts > 0:
+            total_expected += (my_pts / same_pts) * total_pool
+
+    return round(total_expected)
 
 def final_payouts():
+    """
+    重み付き按分方式での最終配当
+    全プール ÷ 的中者の加重ポイント合計 × 個人ポイント
+    余りが出た場合は最高ポイント者に加算
+    """
     results = get_cfg('results')
     if not results:
         return None
     r1, r2, r3 = results['1st'], results['2nd'], results['3rd']
-    trio_key = '|'.join(sorted([r1, r2, r3]))
-    pools, totals = calc_pools()
+    trio_correct = sorted([r1, r2, r3])
+    weights = get_weights()
+
+    all_bets = Bet.query.all()
+    total_pool = sum(b.amount for b in all_bets)
+
+    # 各参加者の的中ポイントを計算
+    correct_pts = {}
+    for p in Participant.query.all():
+        pts = 0
+        for b in p.bets:
+            w = weights.get(b.bet_type, 1)
+            if b.bet_type == 'trifecta':
+                if b.team1 == r1 and b.team2 == r2 and b.team3 == r3:
+                    pts += b.amount * w
+            elif b.bet_type == 'trio':
+                if sorted(filter(None, [b.team1, b.team2, b.team3])) == trio_correct:
+                    pts += b.amount * w
+            elif b.bet_type == 'win':
+                if b.team1 == r1:
+                    pts += b.amount * w
+        if pts > 0:
+            correct_pts[p.name] = pts
+
+    total_correct = sum(correct_pts.values())
 
     out = {}
     for p in Participant.query.all():
-        pay = 0
-        for b in p.bets:
-            bt = b.bet_type
-            if bt == 'trifecta':
-                if b.team1 == r1 and b.team2 == r2 and b.team3 == r3:
-                    w_total = pools['trifecta'].get(f"{r1}|{r2}|{r3}", 0)
-                    if w_total:
-                        pay += b.amount * totals['trifecta'] / w_total
-            elif bt == 'trio':
-                my_key = '|'.join(sorted(filter(None, [b.team1, b.team2, b.team3])))
-                if my_key == trio_key:
-                    w_total = pools['trio'].get(trio_key, 0)
-                    if w_total:
-                        pay += b.amount * totals['trio'] / w_total
-            elif bt == 'win':
-                if b.team1 == r1:
-                    w_total = pools['win'].get(r1, 0)
-                    if w_total:
-                        pay += b.amount * totals['win'] / w_total
-        out[p.name] = round(pay)
+        if p.name in correct_pts and total_correct > 0:
+            out[p.name] = round(correct_pts[p.name] / total_correct * total_pool)
+        else:
+            out[p.name] = 0
+
+    # 端数調整（余りなし保証）
+    if total_correct > 0:
+        diff = total_pool - sum(out.values())
+        if diff != 0 and correct_pts:
+            top = max(correct_pts, key=lambda x: correct_pts[x])
+            out[top] += diff
+
     return out
 
 # ── 試合・順位ルート ──────────────────────────────────────────────
@@ -366,6 +403,58 @@ def logout():
     session.clear()
     return redirect(url_for('index'))
 
+@app.route('/api/change-name', methods=['POST'])
+def change_name():
+    if 'token' not in session:
+        return jsonify({'error': '未登録'}), 401
+    new_name = request.json.get('name', '').strip()
+    if not new_name or len(new_name) > 20:
+        return jsonify({'error': '名前は1〜20文字で入力してください'}), 400
+    p = Participant.query.filter_by(token=session['token']).first()
+    if not p:
+        return jsonify({'error': '参加者が見つかりません'}), 404
+    existing = Participant.query.filter_by(name=new_name).first()
+    if existing and existing.id != p.id:
+        return jsonify({'error': 'その名前はすでに使われています'}), 400
+    p.name = new_name
+    db.session.commit()
+    return jsonify({'ok': True, 'name': new_name})
+
+@app.route('/api/participants-bets')
+def participants_bets():
+    """全参加者の賭け内容を返す"""
+    result = []
+    for p in Participant.query.order_by(Participant.joined_at).all():
+        bets = []
+        for b in p.bets:
+            label = ''
+            if b.bet_type == 'trifecta':
+                label = f"3連単: {b.team1} → {b.team2} → {b.team3}"
+            elif b.bet_type == 'trio':
+                label = f"3連複: {b.team1} / {b.team2} / {b.team3}"
+            elif b.bet_type == 'win':
+                label = f"単勝: {b.team1}"
+            bets.append({'type': b.bet_type, 'label': label, 'amount': b.amount})
+        result.append({'name': p.name, 'bets': bets, 'has_bet': len(bets) > 0})
+    return jsonify(result)
+
+@app.route('/api/my-bet')
+def my_bet():
+    """自分の現在の賭け内容を返す"""
+    if 'token' not in session:
+        return jsonify({'bets': []})
+    p = Participant.query.filter_by(token=session['token']).first()
+    if not p:
+        return jsonify({'bets': []})
+    bets = []
+    for b in p.bets:
+        bets.append({
+            'type': b.bet_type,
+            'team1': b.team1, 'team2': b.team2, 'team3': b.team3,
+            'amount': b.amount
+        })
+    return jsonify({'name': p.name, 'bets': bets})
+
 @app.route('/api/bet', methods=['POST'])
 def place_bet():
     if 'token' not in session:
@@ -455,6 +544,11 @@ def admin():
             set_cfg('buy_in', int(request.form['buy_in']))
             set_cfg('admin_password', request.form['admin_password'])
             set_cfg('football_api_key', request.form.get('football_api_key', '').strip())
+            set_cfg('weights', {
+                'trifecta': int(request.form.get('w_trifecta', 3)),
+                'trio':     int(request.form.get('w_trio', 2)),
+                'win':      int(request.form.get('w_win', 1)),
+            })
             deadline_str = request.form.get('deadline', '').strip()
             if deadline_str:
                 dt = datetime.fromisoformat(deadline_str).replace(tzinfo=timezone.utc)
@@ -496,6 +590,7 @@ def admin():
         buy_in=get_cfg('buy_in', 1000),
         admin_password=get_cfg('admin_password', 'admin1234'),
         football_api_key=get_cfg('football_api_key', ''),
+        weights=get_weights(),
         deadline=get_cfg('deadline', ''),
         is_open=get_cfg('is_open', True),
         totals=totals,
