@@ -3,33 +3,56 @@
 
 <!-- ヒーローバナー -->
 <div class="card rounded-2xl p-6 mb-6 text-center relative overflow-hidden">
-  <div class="absolute inset-0 opacity-10" style="background: repeating-linear-gradient(45deg, #FFD700 0, #FFD700 1px, transparent 0, transparent 50%) 0/20px 20px;"></div>
+  <div class="absolute inset-0 opacity-10" style="background: repeating-linear-gradient(45deg,#FFD700 0,#FFD700 1px,transparent 0,transparent 50%) 0/20px 20px;"></div>
   <h1 class="text-3xl font-black mb-1 relative">🏆 2026 FIFA World Cup</h1>
-  <p class="text-gray-400 relative">カナダ・メキシコ・アメリカ開催 — 6月11日開幕</p>
+  <p class="text-gray-400 relative">カナダ・メキシコ・アメリカ開催</p>
   <div id="countdown" class="text-yellow-400 font-bold mt-2 text-lg relative"></div>
   {% if deadline %}
   <div class="mt-2 text-sm text-gray-400 relative">
-    締め切り: <span class="text-orange-400 font-semibold" id="deadline-display">読み込み中...</span>
+    締め切り: <span class="text-orange-400 font-semibold" id="deadline-display">--</span>
   </div>
   {% endif %}
   {% if not is_open %}
-  <div class="mt-3 inline-block bg-red-900 text-red-300 px-4 py-1 rounded-full text-sm font-bold relative">🔒 賭け締め切り済み</div>
+  <div class="mt-3 inline-block bg-red-900 text-red-300 px-4 py-1 rounded-full text-sm font-bold relative">🔒 予想締め切り済み</div>
   {% endif %}
 </div>
 
+<!-- ポイントルール説明 -->
+<div class="card rounded-2xl p-5 mb-6">
+  <h2 class="text-sm font-bold text-gray-400 mb-3">📋 ポイントルール</h2>
+  <div class="grid grid-cols-3 gap-3 text-center">
+    <div class="card rounded-xl p-3">
+      <div class="text-yellow-400 font-black text-2xl">15pt</div>
+      <div class="text-xs text-gray-300 mt-1 font-bold">3連単</div>
+      <div class="text-xs text-gray-500 mt-0.5">1位・2位・3位を順番通りに的中</div>
+    </div>
+    <div class="card rounded-xl p-3">
+      <div class="text-blue-400 font-black text-2xl">5pt</div>
+      <div class="text-xs text-gray-300 mt-1 font-bold">3連複</div>
+      <div class="text-xs text-gray-500 mt-0.5">トップ3チームを順不同で的中</div>
+    </div>
+    <div class="card rounded-xl p-3">
+      <div class="text-gray-300 font-black text-2xl">1pt×</div>
+      <div class="text-xs text-gray-300 mt-1 font-bold">チーム的中</div>
+      <div class="text-xs text-gray-500 mt-0.5">予想した中でトップ3に入ったチーム数分</div>
+    </div>
+  </div>
+  <div class="mt-3 text-xs text-gray-500 text-center">配当 = 自分のpt ÷ 全員のpt合計 × 総プール（{{ '{:,}'.format(buy_in) }}円 × 参加人数）</div>
+</div>
+
 <!-- 統計バー -->
-<div id="stats-bar" class="grid grid-cols-3 gap-3 mb-6">
+<div class="grid grid-cols-3 gap-3 mb-6">
   <div class="card rounded-xl p-4 text-center">
     <div class="text-2xl font-black text-green-400" id="stat-participants">--</div>
-    <div class="text-xs text-gray-400 mt-1">参加者数</div>
+    <div class="text-xs text-gray-400 mt-1">予想済み / 参加者</div>
   </div>
   <div class="card rounded-xl p-4 text-center">
     <div class="text-2xl font-black text-yellow-400" id="stat-pool">--</div>
     <div class="text-xs text-gray-400 mt-1">総プール</div>
   </div>
   <div class="card rounded-xl p-4 text-center">
-    <div class="text-2xl font-black text-purple-400" id="stat-my-expected">--</div>
-    <div class="text-xs text-gray-400 mt-1">あなたの予想報酬</div>
+    <div class="text-2xl font-black text-purple-400" id="stat-my-scenario">--</div>
+    <div class="text-xs text-gray-400 mt-1" id="stat-my-label">3連単的中時</div>
   </div>
 </div>
 
@@ -38,31 +61,26 @@
 <div class="card rounded-2xl p-6 mb-6 border border-yellow-500 border-opacity-50">
   <h2 class="text-xl font-black text-yellow-400 mb-4">🏆 大会結果 & 配当</h2>
   <div class="flex gap-4 mb-6 flex-wrap">
-    <div class="flex-1 min-w-32 card rounded-xl p-4 text-center">
-      <div class="text-3xl mb-1">🥇</div>
-      <div class="font-bold text-yellow-400">{{ results['1st'] }}</div>
-    </div>
-    <div class="flex-1 min-w-32 card rounded-xl p-4 text-center">
-      <div class="text-3xl mb-1">🥈</div>
-      <div class="font-bold text-gray-300">{{ results['2nd'] }}</div>
-    </div>
-    <div class="flex-1 min-w-32 card rounded-xl p-4 text-center">
-      <div class="text-3xl mb-1">🥉</div>
-      <div class="font-bold text-orange-400">{{ results['3rd'] }}</div>
-    </div>
+    <div class="flex-1 min-w-28 card rounded-xl p-4 text-center"><div class="text-3xl mb-1">🥇</div><div class="font-bold text-yellow-400">{{ results['1st'] }}</div></div>
+    <div class="flex-1 min-w-28 card rounded-xl p-4 text-center"><div class="text-3xl mb-1">🥈</div><div class="font-bold text-gray-300">{{ results['2nd'] }}</div></div>
+    <div class="flex-1 min-w-28 card rounded-xl p-4 text-center"><div class="text-3xl mb-1">🥉</div><div class="font-bold text-orange-400">{{ results['3rd'] }}</div></div>
   </div>
-  {% if payouts %}
-  <h3 class="font-bold text-gray-300 mb-3">💰 配当結果</h3>
+  {% if payouts and pts_map %}
+  <h3 class="font-bold text-gray-300 mb-3">💰 最終配当</h3>
   <div class="space-y-2">
     {% set sorted_payouts = payouts.items() | sort(attribute='1', reverse=True) %}
     {% for name, amount in sorted_payouts %}
     <div class="flex items-center justify-between card rounded-lg px-4 py-2 {% if amount > 0 %}border border-yellow-500 border-opacity-30{% endif %}">
-      <span class="font-semibold {% if loop.index == 1 %}text-yellow-400{% endif %}">
-        {% if loop.index == 1 %}🏆 {% elif loop.index == 2 %}🥈 {% elif loop.index == 3 %}🥉 {% endif %}
-        {{ name }}
-      </span>
+      <div>
+        <span class="font-semibold {% if loop.index == 1 and amount > 0 %}text-yellow-400{% endif %}">
+          {% if loop.index <= 3 and amount > 0 %}{{ ['🥇','🥈','🥉'][loop.index-1] }} {% endif %}{{ name }}
+        </span>
+        {% if pts_map and name in pts_map %}
+        <span class="text-xs text-gray-500 ml-2">{{ pts_map[name] }}pt</span>
+        {% endif %}
+      </div>
       <span class="font-black {% if amount > 0 %}text-yellow-400{% else %}text-gray-500{% endif %}">
-        {% if amount > 0 %}+{{ '{:,}'.format(amount) }}円{% else %}ハズレ{% endif %}
+        {% if amount > 0 %}+{{ '{:,}'.format(amount) }}円{% else %}0円{% endif %}
       </span>
     </div>
     {% endfor %}
@@ -79,214 +97,101 @@
     <input name="name" type="text" placeholder="あなたの名前" maxlength="20" required
       class="flex-1 rounded-lg px-4 py-3 border border-gray-600 focus:border-green-500 outline-none text-white text-sm"
       style="background:#1e293b;">
-    <button type="submit" class="btn-primary px-6 py-3 rounded-lg font-bold text-sm whitespace-nowrap">
-      参加する →
-    </button>
+    <button type="submit" class="btn-primary px-6 py-3 rounded-lg font-bold text-sm whitespace-nowrap">参加する →</button>
   </form>
-  <p class="text-gray-500 text-xs mt-2">掛け金: <span class="text-white font-bold">{{ '{:,}'.format(buy_in) }}円</span></p>
+  <p class="text-gray-500 text-xs mt-2">参加費: <span class="text-white font-bold">{{ '{:,}'.format(buy_in) }}円</span></p>
 </div>
 
 {% else %}
-<!-- 賭けフォーム -->
-{% if is_open %}
+<!-- 自分の予想入力・表示 -->
 <div class="card rounded-2xl p-6 mb-6">
-  <div class="flex items-center justify-between mb-4">
-    <h2 class="text-lg font-bold">🎲 予想を入力</h2>
-    <span class="text-sm text-gray-400">合計: <span class="font-bold text-white">{{ '{:,}'.format(buy_in) }}円</span>を配分</span>
+  <div class="flex items-center justify-between mb-1">
+    <h2 class="text-lg font-bold">🎫 自分の予想</h2>
+    <div class="flex gap-2">
+      {% if is_open %}
+      <button onclick="toggleForm()" id="form-toggle-btn" class="text-xs bg-blue-700 hover:bg-blue-600 px-3 py-1.5 rounded-lg font-semibold">✏️ 入力・修正</button>
+      {% endif %}
+      <button onclick="toggleNameEdit()" class="text-xs bg-gray-700 hover:bg-gray-600 px-3 py-1.5 rounded-lg font-semibold">👤 名前変更</button>
+    </div>
+  </div>
+  <p class="text-gray-500 text-xs mb-4">参加費: <span class="text-white font-semibold">{{ '{:,}'.format(buy_in) }}円</span></p>
+
+  <!-- 名前変更フォーム -->
+  <div id="name-edit-form" class="hidden mb-4 card rounded-xl p-4 border border-blue-500 border-opacity-30">
+    <label class="text-xs text-gray-400 mb-2 block">新しい名前</label>
+    <div class="flex gap-2">
+      <input id="new-name-input" type="text" maxlength="20" value="{{ participant.name }}"
+        class="flex-1 rounded-lg px-3 py-2 border border-gray-600 text-sm outline-none" style="background:#1e293b;color:white;">
+      <button onclick="changeName()" class="btn-primary px-4 py-2 rounded-lg text-sm font-bold">変更</button>
+      <button onclick="toggleNameEdit()" class="bg-gray-700 px-3 py-2 rounded-lg text-sm">✕</button>
+    </div>
+    <div id="name-msg" class="text-xs mt-2 hidden"></div>
   </div>
 
-  <!-- タブ -->
-  <div class="flex border-b border-gray-700 mb-5">
-    <button class="tab-btn px-4 py-2 text-sm font-semibold tab-active" data-tab="trifecta">3連単</button>
-    <button class="tab-btn px-4 py-2 text-sm font-semibold text-gray-400" data-tab="trio">3連複</button>
-    <button class="tab-btn px-4 py-2 text-sm font-semibold text-gray-400" data-tab="win">単勝</button>
-    <button class="tab-btn px-4 py-2 text-sm font-semibold text-gray-400" data-tab="mix">分割</button>
-  </div>
+  <!-- 現在の予想表示 -->
+  <div id="my-pred-display" class="mb-4"></div>
 
-  <!-- 3連単タブ -->
-  <div id="tab-trifecta" class="tab-content">
-    <p class="text-xs text-gray-400 mb-3">1位・2位・3位を順番通りに予想。高配当！</p>
+  <!-- 入力フォーム（折りたたみ） -->
+  {% if is_open %}
+  <div id="pred-form" class="hidden">
     <div class="grid grid-cols-3 gap-3 mb-4">
       <div>
         <label class="text-xs text-yellow-400 font-bold mb-1 block">🥇 1位</label>
-        <select id="tri-1st" class="w-full rounded-lg px-3 py-2 border text-sm">
+        <select id="pred-1st" class="w-full rounded-lg px-3 py-2 border border-gray-600 text-sm" style="background:#1e293b;color:white;">
           <option value="">選択...</option>
           {% for t in teams %}<option value="{{ t }}">{{ t }}</option>{% endfor %}
         </select>
       </div>
       <div>
         <label class="text-xs text-gray-300 font-bold mb-1 block">🥈 2位</label>
-        <select id="tri-2nd" class="w-full rounded-lg px-3 py-2 border text-sm">
+        <select id="pred-2nd" class="w-full rounded-lg px-3 py-2 border border-gray-600 text-sm" style="background:#1e293b;color:white;">
           <option value="">選択...</option>
           {% for t in teams %}<option value="{{ t }}">{{ t }}</option>{% endfor %}
         </select>
       </div>
       <div>
         <label class="text-xs text-orange-400 font-bold mb-1 block">🥉 3位</label>
-        <select id="tri-3rd" class="w-full rounded-lg px-3 py-2 border text-sm">
+        <select id="pred-3rd" class="w-full rounded-lg px-3 py-2 border border-gray-600 text-sm" style="background:#1e293b;color:white;">
           <option value="">選択...</option>
           {% for t in teams %}<option value="{{ t }}">{{ t }}</option>{% endfor %}
         </select>
       </div>
     </div>
-    <div id="tri-odds-preview" class="text-xs text-gray-500 mb-4"></div>
-    <button onclick="submitSingleBet('trifecta')" class="btn-primary w-full py-3 rounded-lg font-bold">
-      {{ '{:,}'.format(buy_in) }}円 全額で3連単を賭ける
-    </button>
+    <div id="pred-preview" class="text-xs text-gray-500 mb-3 min-h-4"></div>
+    <button onclick="submitPrediction()" class="btn-primary w-full py-3 rounded-lg font-bold">予想を確定する</button>
+    <div id="bet-msg" class="mt-2 text-sm text-center hidden"></div>
   </div>
-
-  <!-- 3連複タブ -->
-  <div id="tab-trio" class="tab-content hidden">
-    <p class="text-xs text-gray-400 mb-3">トップ3に入るチームを順不同で予想。3連単より当たりやすい。</p>
-    <div class="grid grid-cols-3 gap-3 mb-4">
-      <div>
-        <label class="text-xs text-gray-300 font-bold mb-1 block">チーム1</label>
-        <select id="trio-1" class="w-full rounded-lg px-3 py-2 border text-sm">
-          <option value="">選択...</option>
-          {% for t in teams %}<option value="{{ t }}">{{ t }}</option>{% endfor %}
-        </select>
-      </div>
-      <div>
-        <label class="text-xs text-gray-300 font-bold mb-1 block">チーム2</label>
-        <select id="trio-2" class="w-full rounded-lg px-3 py-2 border text-sm">
-          <option value="">選択...</option>
-          {% for t in teams %}<option value="{{ t }}">{{ t }}</option>{% endfor %}
-        </select>
-      </div>
-      <div>
-        <label class="text-xs text-gray-300 font-bold mb-1 block">チーム3</label>
-        <select id="trio-3" class="w-full rounded-lg px-3 py-2 border text-sm">
-          <option value="">選択...</option>
-          {% for t in teams %}<option value="{{ t }}">{{ t }}</option>{% endfor %}
-        </select>
-      </div>
-    </div>
-    <div id="trio-odds-preview" class="text-xs text-gray-500 mb-4"></div>
-    <button onclick="submitSingleBet('trio')" class="btn-primary w-full py-3 rounded-lg font-bold">
-      {{ '{:,}'.format(buy_in) }}円 全額で3連複を賭ける
-    </button>
-  </div>
-
-  <!-- 単勝タブ -->
-  <div id="tab-win" class="tab-content hidden">
-    <p class="text-xs text-gray-400 mb-3">優勝チームだけを予想。最も当たりやすいが配当は低め。</p>
-    <select id="win-team" class="w-full rounded-lg px-3 py-2 border text-sm mb-4">
-      <option value="">優勝チームを選択...</option>
-      {% for t in teams %}<option value="{{ t }}">{{ t }}</option>{% endfor %}
-    </select>
-    <div id="win-odds-preview" class="text-xs text-gray-500 mb-4"></div>
-    <button onclick="submitSingleBet('win')" class="btn-primary w-full py-3 rounded-lg font-bold">
-      {{ '{:,}'.format(buy_in) }}円 全額で単勝を賭ける
-    </button>
-  </div>
-
-  <!-- 分割タブ -->
-  <div id="tab-mix" class="tab-content hidden">
-    <p class="text-xs text-gray-400 mb-3">{{ '{:,}'.format(buy_in) }}円を複数の賭け種別に分けて賭ける。残り: <span id="mix-remaining" class="text-yellow-400 font-bold">{{ buy_in }}</span>円</p>
-
-    <div id="mix-bets" class="space-y-4"></div>
-
-    <button onclick="addMixBet()" class="mt-3 w-full py-2 rounded-lg border border-dashed border-gray-600 text-gray-400 text-sm hover:border-gray-400 hover:text-white transition">
-      + 賭けを追加
-    </button>
-
-    <button onclick="submitMixBets()" class="btn-primary w-full py-3 rounded-lg font-bold mt-4">
-      分割で賭ける
-    </button>
-  </div>
-
-  <div id="bet-message" class="mt-3 text-sm text-center hidden"></div>
-</div>
-{% else %}
-<div class="card rounded-xl p-4 mb-6 border border-orange-500 border-opacity-30 text-center text-orange-400">
-  🔒 賭けの締め切りが過ぎました。予想の変更はできません。
-</div>
-{% endif %}
-{% endif %}
-
-<!-- 自分の賭け内容 -->
-{% if participant %}
-<div class="card rounded-2xl p-6 mb-6" id="my-bet-section">
-  <div class="flex items-center justify-between mb-4">
-    <h2 class="text-lg font-bold">🎫 自分の賭け</h2>
-    <div class="flex gap-2">
-      {% if is_open %}
-      <button onclick="startEditBet()" class="text-xs bg-blue-700 hover:bg-blue-600 px-3 py-1.5 rounded-lg font-semibold">✏️ 修正する</button>
-      {% endif %}
-      <button onclick="toggleNameEdit()" class="text-xs bg-gray-700 hover:bg-gray-600 px-3 py-1.5 rounded-lg font-semibold">👤 名前変更</button>
-    </div>
-  </div>
-
-  <!-- 名前変更フォーム -->
-  <div id="name-edit-form" class="hidden mb-4 card rounded-xl p-4 border border-blue-500 border-opacity-30">
-    <label class="text-xs text-gray-400 mb-2 block">新しい名前</label>
-    <div class="flex gap-2">
-      <input id="new-name-input" type="text" maxlength="20" placeholder="名前を入力"
-        value="{{ participant.name }}"
-        class="flex-1 rounded-lg px-3 py-2 border border-gray-600 text-sm outline-none"
-        style="background:#1e293b; color:white;">
-      <button onclick="changeName()" class="btn-primary px-4 py-2 rounded-lg text-sm font-bold">変更</button>
-      <button onclick="toggleNameEdit()" class="bg-gray-700 px-3 py-2 rounded-lg text-sm">キャンセル</button>
-    </div>
-    <div id="name-msg" class="text-xs mt-2 hidden"></div>
-  </div>
-
-  <!-- 賭け内容表示 -->
-  <div id="my-bet-display">
-    <div class="text-gray-500 text-sm text-center py-4">読み込み中...</div>
-  </div>
+  {% endif %}
 </div>
 {% endif %}
 
-<!-- みんなの賭け -->
+<!-- みんなの予想 -->
 <div class="card rounded-2xl p-6 mb-6">
   <div class="flex items-center justify-between mb-4">
-    <h2 class="text-lg font-bold">👀 みんなの賭け</h2>
-    <button onclick="toggleAllBets()" class="text-xs text-gray-400 hover:text-white" id="toggle-all-bets-btn">表示する ▼</button>
+    <h2 class="text-lg font-bold">👀 みんなの予想</h2>
+    <button onclick="toggleAllBets()" id="toggle-all-bets-btn" class="text-xs text-gray-400 hover:text-white">表示する ▼</button>
   </div>
-  <div id="all-bets-content" class="hidden space-y-3">
-    <div class="text-gray-500 text-sm text-center py-4">読み込み中...</div>
-  </div>
+  <div id="all-bets-content" class="hidden space-y-2"></div>
 </div>
 
-<!-- ライブオッズ -->
+<!-- 人気予想ランキング -->
 <div class="card rounded-2xl p-6 mb-6">
-  <div class="flex items-center justify-between mb-4">
-    <h2 class="text-lg font-bold">📊 ライブオッズ</h2>
-    <span class="text-xs text-gray-500" id="last-updated"></span>
+  <h2 class="text-lg font-bold mb-4">🔥 人気予想ランキング</h2>
+  <div id="top-predictions" class="space-y-2 text-sm">
+    <div class="text-gray-500 text-sm text-center py-4">読み込み中...</div>
   </div>
-
-  <div class="flex border-b border-gray-700 mb-4">
-    <button class="odds-tab-btn px-4 py-2 text-sm font-semibold tab-active" data-tab="trifecta">3連単</button>
-    <button class="odds-tab-btn px-4 py-2 text-sm font-semibold text-gray-400" data-tab="trio">3連複</button>
-    <button class="odds-tab-btn px-4 py-2 text-sm font-semibold text-gray-400" data-tab="win">単勝</button>
-  </div>
-
-  <div id="odds-trifecta" class="odds-panel">
-    <div id="odds-list-trifecta" class="space-y-2 text-sm"></div>
-  </div>
-  <div id="odds-trio" class="odds-panel hidden">
-    <div id="odds-list-trio" class="space-y-2 text-sm"></div>
-  </div>
-  <div id="odds-win" class="odds-panel hidden">
-    <div id="odds-list-win" class="space-y-2 text-sm"></div>
-  </div>
-  <div class="text-xs text-gray-600 mt-3 text-center">30秒ごとに自動更新</div>
+  <div class="text-xs text-gray-600 mt-3 text-center" id="last-updated"></div>
 </div>
 
 <!-- 参加者一覧 -->
 <div class="card rounded-2xl p-6">
-  <h2 class="text-lg font-bold mb-4">👥 参加者 ({{ participants | length }}人)</h2>
+  <h2 class="text-lg font-bold mb-4">👥 参加者 (<span id="participant-count">{{ participants | length }}</span>人)</h2>
   <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
     {% for p in participants %}
-    <div class="card rounded-lg px-3 py-2 text-center text-sm
-      {% if p.bets %}border border-green-500 border-opacity-30 text-green-400{% else %}text-gray-500{% endif %}">
+    <div class="card rounded-lg px-3 py-2 text-center text-sm {% if p.bets %}border border-green-500 border-opacity-30 text-green-400{% else %}text-gray-500{% endif %}">
       {% if p.bets %}✅{% else %}⏳{% endif %} {{ p.name }}
     </div>
     {% endfor %}
-    {% if participants | length == 0 %}
-    <div class="col-span-4 text-gray-500 text-sm text-center py-4">まだ参加者がいません</div>
-    {% endif %}
   </div>
   <p class="text-xs text-gray-600 mt-3 text-center">✅ = 予想済み / ⏳ = 未入力</p>
 </div>
@@ -294,296 +199,162 @@
 <script>
 const BUY_IN = {{ buy_in }};
 const TEAMS = {{ teams | tojson }};
-let currentOddsData = {};
-let mixBetCount = 0;
 
-// ── タブ切り替え ──────────────────────────────────────────
-document.querySelectorAll('.tab-btn').forEach(btn => {
-  btn.addEventListener('click', () => {
-    document.querySelectorAll('.tab-btn').forEach(b => { b.classList.remove('tab-active'); b.classList.add('text-gray-400'); });
-    document.querySelectorAll('.tab-content').forEach(c => c.classList.add('hidden'));
-    btn.classList.add('tab-active'); btn.classList.remove('text-gray-400');
-    document.getElementById('tab-' + btn.dataset.tab).classList.remove('hidden');
-  });
-});
-
-document.querySelectorAll('.odds-tab-btn').forEach(btn => {
-  btn.addEventListener('click', () => {
-    document.querySelectorAll('.odds-tab-btn').forEach(b => { b.classList.remove('tab-active'); b.classList.add('text-gray-400'); });
-    document.querySelectorAll('.odds-panel').forEach(c => c.classList.add('hidden'));
-    btn.classList.add('tab-active'); btn.classList.remove('text-gray-400');
-    document.getElementById('odds-' + btn.dataset.tab).classList.remove('hidden');
-  });
-});
-
-// ── オッズ更新 ────────────────────────────────────────────
-async function updateOdds() {
-  try {
-    const res = await fetch('/api/odds');
-    const d = await res.json();
-    currentOddsData = d;
-
-    document.getElementById('stat-participants').textContent = d.bet_count + '/' + d.participant_count;
-    document.getElementById('stat-pool').textContent = d.total_pool.toLocaleString() + '円';
-
-    const myEl = document.getElementById('stat-my-expected');
-    if (d.my_expected !== null && d.my_expected !== undefined) {
-      myEl.textContent = d.my_expected > 0 ? '+' + d.my_expected.toLocaleString() + '円' : '未入力';
-      myEl.className = d.my_expected > 0 ? 'text-2xl font-black text-yellow-400' : 'text-2xl font-black text-gray-500';
-    } else {
-      myEl.textContent = '--';
-    }
-
-    ['trifecta', 'trio', 'win'].forEach(bt => {
-      const list = document.getElementById('odds-list-' + bt);
-      const items = d.top[bt] || [];
-      if (!list) return;
-      if (items.length === 0) {
-        list.innerHTML = '<div class="text-gray-600 text-center py-4">まだ賭けなし</div>';
-        return;
-      }
-      list.innerHTML = items.map((item, i) => {
-        const label = item.key.replace(/\|/g, ' → ');
-        const rankColors = ['text-yellow-400', 'text-gray-300', 'text-orange-400', 'text-gray-400', 'text-gray-500'];
-        return `<div class="flex items-center justify-between">
-          <span class="${rankColors[i] || 'text-gray-500'} font-medium">${label}</span>
-          <div class="flex items-center gap-2">
-            <span class="text-xs text-gray-500">${item.pct}%</span>
-            <span class="odds-badge px-2 py-0.5 rounded text-xs font-bold">${item.odds}倍</span>
-          </div>
-        </div>`;
-      }).join('');
-    });
-
-    document.getElementById('last-updated').textContent = '更新: ' + new Date().toLocaleTimeString('ja-JP');
-    updateOddsPreview();
-  } catch(e) { console.error(e); }
-}
-
-function getOddsFor(bt, key) {
-  if (!currentOddsData.top) return null;
-  const items = currentOddsData.top[bt] || [];
-  const found = items.find(i => i.key === key);
-  return found ? found.odds : null;
-}
-
-function updateOddsPreview() {
-  // 3連単プレビュー
-  const t1 = document.getElementById('tri-1st')?.value;
-  const t2 = document.getElementById('tri-2nd')?.value;
-  const t3 = document.getElementById('tri-3rd')?.value;
-  const triPreview = document.getElementById('tri-odds-preview');
-  if (triPreview && t1 && t2 && t3) {
-    const key = t1 + '|' + t2 + '|' + t3;
-    const o = getOddsFor('trifecta', key);
-    const pay = o ? Math.round(BUY_IN * o) : null;
-    triPreview.innerHTML = o
-      ? `<span class="text-purple-400">現在のオッズ: <b>${o}倍</b></span> → 的中時 <span class="text-yellow-400 font-bold">${pay.toLocaleString()}円</span>の報酬予想`
-      : `<span class="text-green-400">⭐ この組み合わせは初！現在の唯一の予想 — 的中すれば <b>${(BUY_IN * (currentOddsData.totals?.trifecta || BUY_IN) / BUY_IN).toLocaleString()}円</b>超を独占</span>`;
-  }
-
-  // 3連複プレビュー
-  const r1 = document.getElementById('trio-1')?.value;
-  const r2 = document.getElementById('trio-2')?.value;
-  const r3 = document.getElementById('trio-3')?.value;
-  const rioPreview = document.getElementById('trio-odds-preview');
-  if (rioPreview && r1 && r2 && r3) {
-    const key = [r1,r2,r3].sort().join('|');
-    const o = getOddsFor('trio', key);
-    const pay = o ? Math.round(BUY_IN * o) : null;
-    rioPreview.innerHTML = o
-      ? `<span class="text-purple-400">現在のオッズ: <b>${o}倍</b></span> → 的中時 <span class="text-yellow-400 font-bold">${pay.toLocaleString()}円</span>の報酬予想`
-      : `<span class="text-green-400">⭐ この組み合わせは初！</span>`;
-  }
-
-  // 単勝プレビュー
-  const wt = document.getElementById('win-team')?.value;
-  const wPreview = document.getElementById('win-odds-preview');
-  if (wPreview && wt) {
-    const o = getOddsFor('win', wt);
-    const pay = o ? Math.round(BUY_IN * o) : null;
-    wPreview.innerHTML = o
-      ? `<span class="text-purple-400">現在のオッズ: <b>${o}倍</b></span> → 的中時 <span class="text-yellow-400 font-bold">${pay.toLocaleString()}円</span>の報酬予想`
-      : `<span class="text-green-400">⭐ この優勝予想は初！</span>`;
-  }
-}
-
-['tri-1st','tri-2nd','tri-3rd','trio-1','trio-2','trio-3','win-team'].forEach(id => {
-  document.getElementById(id)?.addEventListener('change', updateOddsPreview);
-});
-
-// ── 賭け送信 ──────────────────────────────────────────────
-async function submitSingleBet(type) {
-  let bets = [];
-  if (type === 'trifecta') {
-    const t1 = document.getElementById('tri-1st').value;
-    const t2 = document.getElementById('tri-2nd').value;
-    const t3 = document.getElementById('tri-3rd').value;
-    if (!t1||!t2||!t3) return showMsg('3チームすべて選択してください', 'error');
-    if (new Set([t1,t2,t3]).size < 3) return showMsg('同じチームを複数選べません', 'error');
-    bets = [{ type:'trifecta', team1:t1, team2:t2, team3:t3, amount:BUY_IN }];
-  } else if (type === 'trio') {
-    const r1 = document.getElementById('trio-1').value;
-    const r2 = document.getElementById('trio-2').value;
-    const r3 = document.getElementById('trio-3').value;
-    if (!r1||!r2||!r3) return showMsg('3チームすべて選択してください', 'error');
-    if (new Set([r1,r2,r3]).size < 3) return showMsg('同じチームを複数選べません', 'error');
-    bets = [{ type:'trio', team1:r1, team2:r2, team3:r3, amount:BUY_IN }];
-  } else {
-    const wt = document.getElementById('win-team').value;
-    if (!wt) return showMsg('チームを選択してください', 'error');
-    bets = [{ type:'win', team1:wt, amount:BUY_IN }];
-  }
-  await sendBets(bets);
-}
-
-async function sendBets(bets) {
-  const res = await fetch('/api/bet', {
-    method:'POST', headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({ bets })
-  });
-  const d = await res.json();
-  if (d.ok) {
-    showMsg(`✅ 賭け確定！的中時の予想報酬: ${d.expected_payout.toLocaleString()}円`, 'success');
-    updateOdds();
-  } else {
-    showMsg('❌ ' + (d.error || 'エラー'), 'error');
-  }
-}
-
-function showMsg(msg, type) {
-  const el = document.getElementById('bet-message');
-  if (!el) return;
-  el.textContent = msg;
-  el.className = `mt-3 text-sm text-center px-4 py-2 rounded-lg ${type === 'success' ? 'bg-green-900 text-green-300' : 'bg-red-900 text-red-300'}`;
-  el.classList.remove('hidden');
-  setTimeout(() => el.classList.add('hidden'), 5000);
-}
-
-// ── 分割賭け ──────────────────────────────────────────────
-function addMixBet() {
-  const id = mixBetCount++;
-  const container = document.getElementById('mix-bets');
-  const div = document.createElement('div');
-  div.id = 'mix-bet-' + id;
-  div.className = 'card rounded-xl p-4 relative';
-  div.innerHTML = `
-    <button onclick="removeMixBet(${id})" class="absolute top-2 right-2 text-gray-500 hover:text-red-400 text-lg">×</button>
-    <div class="flex gap-3 items-center mb-3">
-      <select class="mix-type rounded-lg px-3 py-2 border text-sm" onchange="updateMixForm(${id})">
-        <option value="trifecta">3連単</option>
-        <option value="trio">3連複</option>
-        <option value="win">単勝</option>
-      </select>
-      <input type="number" class="mix-amount rounded-lg px-3 py-2 border text-sm w-28" placeholder="金額(円)" min="100" step="100" oninput="updateMixRemaining()">
-    </div>
-    <div class="mix-teams grid grid-cols-3 gap-2">
-      ${makeTeamSelect('mix-t1-'+id,'🥇 1位')}
-      ${makeTeamSelect('mix-t2-'+id,'🥈 2位')}
-      ${makeTeamSelect('mix-t3-'+id,'🥉 3位')}
-    </div>`;
-  container.appendChild(div);
-  updateMixRemaining();
-}
-
-function makeTeamSelect(id, label) {
-  return `<div><label class="text-xs text-gray-400 mb-1 block">${label}</label>
-    <select id="${id}" class="w-full rounded-lg px-2 py-1.5 border text-xs">
-      <option value="">選択...</option>
-      ${TEAMS.map(t=>`<option value="${t}">${t}</option>`).join('')}
-    </select></div>`;
-}
-
-function updateMixForm(id) {}
-
-function removeMixBet(id) {
-  document.getElementById('mix-bet-' + id)?.remove();
-  updateMixRemaining();
-}
-
-function updateMixRemaining() {
-  const amounts = [...document.querySelectorAll('.mix-amount')].map(el => parseInt(el.value)||0);
-  const used = amounts.reduce((a,b)=>a+b,0);
-  const rem = BUY_IN - used;
-  const el = document.getElementById('mix-remaining');
-  if (el) { el.textContent = rem; el.className = rem === 0 ? 'text-green-400 font-bold' : rem < 0 ? 'text-red-400 font-bold' : 'text-yellow-400 font-bold'; }
-}
-
-async function submitMixBets() {
-  const bets = [];
-  let total = 0;
-  document.getElementById('mix-bets').querySelectorAll('[id^=mix-bet-]').forEach(div => {
-    const type = div.querySelector('.mix-type').value;
-    const amount = parseInt(div.querySelector('.mix-amount').value) || 0;
-    const id = div.id.split('-').pop();
-    const t1 = document.getElementById('mix-t1-'+id)?.value;
-    const t2 = document.getElementById('mix-t2-'+id)?.value;
-    const t3 = document.getElementById('mix-t3-'+id)?.value;
-    total += amount;
-    bets.push({ type, team1:t1, team2:t2, team3:t3, amount });
-  });
-  if (total !== BUY_IN) return showMsg(`合計が${BUY_IN}円になるよう入力してください（現在: ${total}円）`, 'error');
-  await sendBets(bets);
-}
-
-// ── カウントダウン & デッドライン ────────────────────────
+// ── カウントダウン ────────────────────────────────────────
 function updateCountdown() {
   const el = document.getElementById('countdown');
   if (!el) return;
   const target = new Date('2026-06-11T00:00:00Z');
-  const now = new Date();
-  const diff = target - now;
+  const diff = target - new Date();
   if (diff <= 0) { el.textContent = '🔴 大会開幕中！'; return; }
-  const d = Math.floor(diff/86400000);
-  const h = Math.floor((diff%86400000)/3600000);
-  const m = Math.floor((diff%3600000)/60000);
+  const d = Math.floor(diff/86400000), h = Math.floor((diff%86400000)/3600000), m = Math.floor((diff%3600000)/60000);
   el.textContent = `開幕まで ${d}日 ${h}時間 ${m}分`;
 }
 
 {% if deadline %}
 const deadline = new Date('{{ deadline }}');
 const dEl = document.getElementById('deadline-display');
-if (dEl) dEl.textContent = deadline.toLocaleString('ja-JP', {timeZone:'Asia/Tokyo'}) + ' JST';
+if (dEl) dEl.textContent = deadline.toLocaleString('ja-JP',{timeZone:'Asia/Tokyo'}) + ' JST';
 {% endif %}
 
-// ── 自分の賭け表示 ────────────────────────────────────────
-const BET_TYPE_LABELS = { trifecta: '3連単', trio: '3連複', win: '単勝' };
-const BET_TYPE_COLORS = { trifecta: 'text-yellow-400', trio: 'text-gray-300', win: 'text-blue-400' };
+// ── フォーム表示切替 ──────────────────────────────────────
+let formVisible = false;
+function toggleForm() {
+  formVisible = !formVisible;
+  document.getElementById('pred-form')?.classList.toggle('hidden', !formVisible);
+  const btn = document.getElementById('form-toggle-btn');
+  if (btn) btn.textContent = formVisible ? '✕ 閉じる' : '✏️ 入力・修正';
+  if (formVisible) loadMyBetIntoForm();
+}
 
+// ── 自分の予想を表示 ─────────────────────────────────────
 async function loadMyBet() {
   const res = await fetch('/api/my-bet');
   const d = await res.json();
-  const el = document.getElementById('my-bet-display');
+  const el = document.getElementById('my-pred-display');
   if (!el) return;
-  if (!d.bets || d.bets.length === 0) {
-    el.innerHTML = '<div class="text-gray-500 text-sm text-center py-4">まだ予想を入力していません</div>';
+  if (!d.prediction) {
+    el.innerHTML = '<div class="text-gray-500 text-sm py-2">まだ予想を入力していません</div>';
     return;
   }
-  el.innerHTML = d.bets.map(b => {
-    let pred = '';
-    if (b.type === 'trifecta') pred = `${b.team1} 🥇 → ${b.team2} 🥈 → ${b.team3} 🥉`;
-    else if (b.type === 'trio') pred = `${b.team1} / ${b.team2} / ${b.team3}`;
-    else pred = `${b.team1} 🏆`;
-    return `<div class="card rounded-xl px-4 py-3 border border-white border-opacity-10">
-      <div class="flex items-center justify-between">
-        <span class="text-xs font-bold ${BET_TYPE_COLORS[b.type] || 'text-white'}">${BET_TYPE_LABELS[b.type] || b.type}</span>
-        <span class="text-xs text-yellow-600 font-bold">${b.amount.toLocaleString()}円</span>
-      </div>
-      <div class="font-semibold mt-1 text-sm">${pred}</div>
-    </div>`;
-  }).join('');
+  const p = d.prediction;
+  el.innerHTML = `<div class="card rounded-xl p-4 border border-green-500 border-opacity-30">
+    <div class="flex items-center justify-between gap-3">
+      <div class="text-center flex-1"><div class="text-xs text-yellow-400 font-bold mb-1">🥇 1位</div><div class="font-bold">${p.team1}</div></div>
+      <div class="text-gray-600">→</div>
+      <div class="text-center flex-1"><div class="text-xs text-gray-300 font-bold mb-1">🥈 2位</div><div class="font-bold">${p.team2}</div></div>
+      <div class="text-gray-600">→</div>
+      <div class="text-center flex-1"><div class="text-xs text-orange-400 font-bold mb-1">🥉 3位</div><div class="font-bold">${p.team3}</div></div>
+    </div>
+  </div>`;
 }
 
-// ── みんなの賭け ──────────────────────────────────────────
-let allBetsLoaded = false;
-let allBetsVisible = false;
+async function loadMyBetIntoForm() {
+  const res = await fetch('/api/my-bet');
+  const d = await res.json();
+  if (!d.prediction) return;
+  document.getElementById('pred-1st').value = d.prediction.team1 || '';
+  document.getElementById('pred-2nd').value = d.prediction.team2 || '';
+  document.getElementById('pred-3rd').value = d.prediction.team3 || '';
+  updatePreview();
+}
 
+// ── プレビュー ────────────────────────────────────────────
+function updatePreview() {
+  const t1 = document.getElementById('pred-1st')?.value;
+  const t2 = document.getElementById('pred-2nd')?.value;
+  const t3 = document.getElementById('pred-3rd')?.value;
+  const el = document.getElementById('pred-preview');
+  if (!el) return;
+  if (t1 && t2 && t3) {
+    if (new Set([t1,t2,t3]).size < 3) {
+      el.innerHTML = '<span class="text-red-400">⚠️ 同じチームを選べません</span>';
+    } else {
+      el.innerHTML = `<span class="text-green-400">✓ ${t1} → ${t2} → ${t3}</span>`;
+    }
+  } else {
+    el.textContent = '3チームすべて選択してください';
+  }
+}
+['pred-1st','pred-2nd','pred-3rd'].forEach(id => document.getElementById(id)?.addEventListener('change', updatePreview));
+
+// ── 予想送信 ──────────────────────────────────────────────
+async function submitPrediction() {
+  const t1 = document.getElementById('pred-1st').value;
+  const t2 = document.getElementById('pred-2nd').value;
+  const t3 = document.getElementById('pred-3rd').value;
+  const msg = document.getElementById('bet-msg');
+
+  if (!t1||!t2||!t3) return showBetMsg('3チームすべて選択してください', 'error');
+  if (new Set([t1,t2,t3]).size < 3) return showBetMsg('同じチームを複数選択できません', 'error');
+
+  const res = await fetch('/api/bet', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({team1:t1, team2:t2, team3:t3})
+  });
+  const d = await res.json();
+  if (d.ok) {
+    showBetMsg('✅ 予想を確定しました！', 'success');
+    loadMyBet();
+    loadStats();
+    setTimeout(() => {
+      formVisible = false;
+      document.getElementById('pred-form')?.classList.add('hidden');
+      const btn = document.getElementById('form-toggle-btn');
+      if (btn) btn.textContent = '✏️ 入力・修正';
+    }, 1500);
+  } else {
+    showBetMsg('❌ ' + (d.error||'エラー'), 'error');
+  }
+}
+
+function showBetMsg(msg, type) {
+  const el = document.getElementById('bet-msg');
+  if (!el) return;
+  el.textContent = msg;
+  el.className = `mt-2 text-sm text-center px-4 py-2 rounded-lg ${type==='success'?'bg-green-900 text-green-300':'bg-red-900 text-red-300'}`;
+  el.classList.remove('hidden');
+  setTimeout(()=>el.classList.add('hidden'), 4000);
+}
+
+// ── 統計更新 ──────────────────────────────────────────────
+async function loadStats() {
+  const res = await fetch('/api/stats');
+  const d = await res.json();
+
+  document.getElementById('stat-participants').textContent = `${d.bet_count}/${d.participant_count}`;
+  document.getElementById('stat-pool').textContent = d.total_pool.toLocaleString() + '円';
+
+  if (d.my_scenarios) {
+    const sc = d.my_scenarios;
+    const trifecta = sc['3連単的中（同予想全員）'] || sc['3連単的中（自分だけ）'];
+    if (trifecta) {
+      document.getElementById('stat-my-scenario').textContent = trifecta.toLocaleString() + '円';
+    }
+  }
+
+  const topEl = document.getElementById('top-predictions');
+  if (d.top_predictions && d.top_predictions.length) {
+    topEl.innerHTML = d.top_predictions.map((p, i) => {
+      const medals = ['🥇','🥈','🥉','4️⃣','5️⃣'];
+      return `<div class="flex items-center justify-between card rounded-lg px-4 py-2">
+        <span class="font-medium">${medals[i]||'　'} ${p.key}</span>
+        <span class="text-xs text-gray-400">${p.count}人 (${p.pct}%)</span>
+      </div>`;
+    }).join('');
+  } else {
+    topEl.innerHTML = '<div class="text-gray-500 text-sm text-center py-4">まだ予想なし</div>';
+  }
+
+  document.getElementById('last-updated').textContent = '更新: ' + new Date().toLocaleTimeString('ja-JP');
+}
+
+// ── みんなの予想 ──────────────────────────────────────────
+let allBetsLoaded = false, allBetsVisible = false;
 async function toggleAllBets() {
-  const content = document.getElementById('all-bets-content');
-  const btn = document.getElementById('toggle-all-bets-btn');
   allBetsVisible = !allBetsVisible;
-  content.classList.toggle('hidden', !allBetsVisible);
-  btn.textContent = allBetsVisible ? '隠す ▲' : '表示する ▼';
+  document.getElementById('all-bets-content').classList.toggle('hidden', !allBetsVisible);
+  document.getElementById('toggle-all-bets-btn').textContent = allBetsVisible ? '隠す ▲' : '表示する ▼';
   if (allBetsVisible && !allBetsLoaded) {
     await loadAllBets();
     allBetsLoaded = true;
@@ -594,87 +365,46 @@ async function loadAllBets() {
   const res = await fetch('/api/participants-bets');
   const data = await res.json();
   const el = document.getElementById('all-bets-content');
-  if (!data.length) {
-    el.innerHTML = '<div class="text-gray-500 text-sm text-center py-4">参加者なし</div>';
-    return;
-  }
   el.innerHTML = data.map(p => {
-    const betHtml = p.has_bet
-      ? p.bets.map(b => `<div class="text-xs mt-1 bg-black bg-opacity-30 rounded px-2 py-1">
-          <span class="font-bold ${BET_TYPE_COLORS[b.type] || 'text-white'}">${BET_TYPE_LABELS[b.type] || b.type}</span>
-          <span class="text-gray-300 ml-2">${b.label.split(': ')[1]}</span>
-          <span class="text-yellow-600 ml-2">${b.amount.toLocaleString()}円</span>
-        </div>`).join('')
-      : '<div class="text-xs text-gray-600 mt-1">未入力</div>';
-    return `<div class="card rounded-xl px-4 py-3">
-      <div class="font-semibold text-sm ${p.has_bet ? 'text-green-400' : 'text-gray-500'}">
-        ${p.has_bet ? '✅' : '⏳'} ${p.name}
-      </div>
-      ${betHtml}
+    const pred = p.prediction
+      ? `<span class="text-white">${p.prediction.team1}</span> <span class="text-gray-500">→</span> <span class="text-white">${p.prediction.team2}</span> <span class="text-gray-500">→</span> <span class="text-white">${p.prediction.team3}</span>`
+      : '<span class="text-gray-600">未入力</span>';
+    return `<div class="card rounded-lg px-4 py-2 flex items-center justify-between text-sm">
+      <span class="font-semibold ${p.prediction ? 'text-green-400' : 'text-gray-500'}">${p.prediction ? '✅' : '⏳'} ${p.name}</span>
+      <span class="text-xs">${pred}</span>
     </div>`;
   }).join('');
 }
 
-// ── 賭け修正（フォームに現在値をセット）─────────────────
-async function startEditBet() {
-  const res = await fetch('/api/my-bet');
-  const d = await res.json();
-  if (!d.bets || !d.bets.length) return;
-
-  const b = d.bets[0];
-  // 該当タブをアクティブにしてフォームに値をセット
-  const tabMap = { trifecta: 'trifecta', trio: 'trio', win: 'win' };
-  const tabBtn = document.querySelector(`.tab-btn[data-tab="${tabMap[b.type]}"]`);
-  if (tabBtn) tabBtn.click();
-
-  setTimeout(() => {
-    if (b.type === 'trifecta') {
-      if (document.getElementById('tri-1st')) document.getElementById('tri-1st').value = b.team1 || '';
-      if (document.getElementById('tri-2nd')) document.getElementById('tri-2nd').value = b.team2 || '';
-      if (document.getElementById('tri-3rd')) document.getElementById('tri-3rd').value = b.team3 || '';
-    } else if (b.type === 'trio') {
-      if (document.getElementById('trio-1')) document.getElementById('trio-1').value = b.team1 || '';
-      if (document.getElementById('trio-2')) document.getElementById('trio-2').value = b.team2 || '';
-      if (document.getElementById('trio-3')) document.getElementById('trio-3').value = b.team3 || '';
-    } else {
-      if (document.getElementById('win-team')) document.getElementById('win-team').value = b.team1 || '';
-    }
-    updateOddsPreview();
-    document.querySelector('.card:has(#tab-trifecta)')?.scrollIntoView({ behavior: 'smooth' });
-  }, 100);
-}
-
 // ── 名前変更 ──────────────────────────────────────────────
 function toggleNameEdit() {
-  const form = document.getElementById('name-edit-form');
-  form.classList.toggle('hidden');
+  document.getElementById('name-edit-form')?.classList.toggle('hidden');
 }
-
 async function changeName() {
   const name = document.getElementById('new-name-input').value.trim();
   const msg = document.getElementById('name-msg');
   if (!name) return;
   const res = await fetch('/api/change-name', {
-    method: 'POST', headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({ name })
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({name})
   });
   const d = await res.json();
   msg.classList.remove('hidden');
   if (d.ok) {
-    msg.textContent = `✅ 名前を「${d.name}」に変更しました`;
+    msg.textContent = `✅ 「${d.name}」に変更しました`;
     msg.className = 'text-xs mt-2 text-green-400';
-    setTimeout(() => location.reload(), 1000);
+    setTimeout(()=>location.reload(), 1000);
   } else {
-    msg.textContent = '❌ ' + (d.error || 'エラー');
+    msg.textContent = '❌ ' + (d.error||'エラー');
     msg.className = 'text-xs mt-2 text-red-400';
   }
 }
 
-// ── 初期化 & ポーリング ───────────────────────────────────
-updateOdds();
-updateCountdown();
+// ── 初期化 ────────────────────────────────────────────────
 loadMyBet();
-setInterval(updateOdds, 30000);
+loadStats();
+updateCountdown();
+setInterval(loadStats, 30000);
 setInterval(updateCountdown, 60000);
 </script>
 

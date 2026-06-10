@@ -165,118 +165,102 @@ def is_betting_open():
         return datetime.now(timezone.utc) < datetime.fromisoformat(deadline)
     return True
 
-def get_weights():
-    """賭け種別の難易度ポイント倍率を取得"""
-    return get_cfg('weights', {'trifecta': 3, 'trio': 2, 'win': 1})
+POINTS = {'trifecta': 15, 'trio': 5, 'team': 1}  # 固定ポイント
 
-def bet_key(b):
-    if b.bet_type == 'trifecta':
-        return f"{b.team1}|{b.team2}|{b.team3}"
-    elif b.bet_type == 'trio':
-        return '|'.join(sorted(filter(None, [b.team1, b.team2, b.team3])))
-    else:
-        return b.team1 or ''
+def score_prediction(b, r1, r2, r3):
+    """
+    予想bに対してポイントを計算
+    3連単(順番通り)=15pt / 3連複(3チーム正解・順不同)=5pt / 各チーム=1pt
+    ※ 上位ルールが成立したら下位は加算しない
+    """
+    top3 = {r1, r2, r3}
+    my = [b.team1, b.team2, b.team3]
 
-def calc_pools():
-    """表示用：賭け種別ごとのプール集計"""
+    if b.team1 == r1 and b.team2 == r2 and b.team3 == r3:
+        return 15  # 3連単
+    if set(filter(None, my)) == top3:
+        return 5   # 3連複
+    return sum(1 for t in my if t and t in top3)  # チーム単位（0〜2pt）
+
+def calc_stats():
+    """表示用：予想の集計・重複チェック用"""
     bets = Bet.query.all()
-    pools  = {'trifecta': {}, 'trio': {}, 'win': {}}
-    totals = {'trifecta': 0, 'trio': 0, 'win': 0}
+    total_pool = sum(b.amount for b in bets)
+    pred_count = {}
     for b in bets:
-        bt = b.bet_type
-        totals[bt] += b.amount
-        k = bet_key(b)
-        pools[bt][k] = pools[bt].get(k, 0) + b.amount
-    return pools, totals
+        key = f"{b.team1}|{b.team2}|{b.team3}"
+        pred_count[key] = pred_count.get(key, 0) + 1
+    return total_pool, pred_count
 
-def odds_for(pools, totals):
-    """表示用：パリミュチュエルオッズ"""
-    result = {}
-    for bt, pool in pools.items():
-        result[bt] = {}
-        for key, amt in pool.items():
-            result[bt][key] = round(totals[bt] / amt, 2) if amt else 0
-    return result
-
-def expected_payout(participant):
+def payout_scenarios(participant):
     """
-    重み付き按分方式での予想報酬
-    ＝ 自分と同じ組み合わせに賭けた人だけが的中と仮定して計算
+    自分の予想に対して「もし3連単/3連複/N人が当たったら」の推定配当を返す
     """
-    weights = get_weights()
+    if not participant.bets:
+        return None
+    b = participant.bets[0]
     all_bets = Bet.query.all()
-    total_pool = sum(b.amount for b in all_bets)
+    total_pool = sum(x.amount for x in all_bets)
     if total_pool == 0:
-        return 0
+        return None
 
-    total_expected = 0
-    for b in participant.bets:
-        w = weights.get(b.bet_type, 1)
-        my_pts = b.amount * w
-        my_key = bet_key(b)
+    # 同じ予想の人数
+    same_key = f"{b.team1}|{b.team2}|{b.team3}"
+    same_count = sum(1 for x in all_bets if f"{x.team1}|{x.team2}|{x.team3}" == same_key)
 
-        # 同じ組み合わせに賭けた全員の加重ポイント合計
-        same_pts = sum(
-            x.amount * weights.get(x.bet_type, 1)
-            for x in all_bets
-            if x.bet_type == b.bet_type and bet_key(x) == my_key
-        )
-        if same_pts > 0:
-            total_expected += (my_pts / same_pts) * total_pool
+    # 現時点の全員ポイント合計（仮に3連単が当たった場合）
+    scenarios = {}
+    for label, my_pts, others_pts in [
+        ('3連単的中（自分だけ）', 15, 0),
+        ('3連単的中（同予想全員）', 15, 15 * (same_count - 1)),
+        ('3連複的中（自分だけ）', 5, 0),
+    ]:
+        total_pts = my_pts + others_pts
+        if total_pts > 0:
+            scenarios[label] = round(my_pts / total_pts * total_pool)
 
-    return round(total_expected)
+    return scenarios
 
 def final_payouts():
     """
-    重み付き按分方式での最終配当
-    全プール ÷ 的中者の加重ポイント合計 × 個人ポイント
-    余りが出た場合は最高ポイント者に加算
+    ポイント按分方式での最終配当
+    各自のポイント / 全員のポイント合計 × 総プール
+    全員0ポイントの場合は全額返金
     """
     results = get_cfg('results')
     if not results:
         return None
     r1, r2, r3 = results['1st'], results['2nd'], results['3rd']
-    trio_correct = sorted([r1, r2, r3])
-    weights = get_weights()
 
     all_bets = Bet.query.all()
     total_pool = sum(b.amount for b in all_bets)
 
-    # 各参加者の的中ポイントを計算
-    correct_pts = {}
+    # 各参加者のポイント計算
+    pts_map = {}
     for p in Participant.query.all():
         pts = 0
         for b in p.bets:
-            w = weights.get(b.bet_type, 1)
-            if b.bet_type == 'trifecta':
-                if b.team1 == r1 and b.team2 == r2 and b.team3 == r3:
-                    pts += b.amount * w
-            elif b.bet_type == 'trio':
-                if sorted(filter(None, [b.team1, b.team2, b.team3])) == trio_correct:
-                    pts += b.amount * w
-            elif b.bet_type == 'win':
-                if b.team1 == r1:
-                    pts += b.amount * w
-        if pts > 0:
-            correct_pts[p.name] = pts
+            pts += score_prediction(b, r1, r2, r3)
+        pts_map[p.name] = pts
 
-    total_correct = sum(correct_pts.values())
+    total_pts = sum(pts_map.values())
 
     out = {}
-    for p in Participant.query.all():
-        if p.name in correct_pts and total_correct > 0:
-            out[p.name] = round(correct_pts[p.name] / total_correct * total_pool)
-        else:
-            out[p.name] = 0
+    for name, pts in pts_map.items():
+        out[name] = round(pts / total_pts * total_pool) if total_pts > 0 else 0
 
     # 端数調整（余りなし保証）
-    if total_correct > 0:
+    if total_pts > 0:
         diff = total_pool - sum(out.values())
-        if diff != 0 and correct_pts:
-            top = max(correct_pts, key=lambda x: correct_pts[x])
+        if diff != 0:
+            top = max(pts_map, key=lambda x: pts_map[x])
             out[top] += diff
+    else:
+        # 全員0ptなら全額返金
+        per_person = total_pool // len(out) if out else 0
+        out = {name: per_person for name in out}
 
-    return out
+    return out, pts_map  # pts_mapも返す
 
 # ── 試合・順位ルート ──────────────────────────────────────────────
 @app.route('/matches')
@@ -373,15 +357,18 @@ def index():
         participant = Participant.query.filter_by(token=session['token']).first()
     participants = Participant.query.order_by(Participant.joined_at).all()
     results = get_cfg('results')
-    payouts = final_payouts() if results else None
+    fp = final_payouts() if results else None
+    payouts = fp[0] if fp else None
+    pts_map = fp[1] if fp else None
     return render_template('index.html',
         participant=participant,
         participants=participants,
-        buy_in=get_cfg('buy_in', 1000),
+        buy_in=get_cfg('buy_in', 3000),
         is_open=is_betting_open(),
         deadline=get_cfg('deadline'),
         results=results,
         payouts=payouts,
+        pts_map=pts_map,
         teams=TEAMS,
     )
 
@@ -422,38 +409,27 @@ def change_name():
 
 @app.route('/api/participants-bets')
 def participants_bets():
-    """全参加者の賭け内容を返す"""
     result = []
     for p in Participant.query.order_by(Participant.joined_at).all():
-        bets = []
-        for b in p.bets:
-            label = ''
-            if b.bet_type == 'trifecta':
-                label = f"3連単: {b.team1} → {b.team2} → {b.team3}"
-            elif b.bet_type == 'trio':
-                label = f"3連複: {b.team1} / {b.team2} / {b.team3}"
-            elif b.bet_type == 'win':
-                label = f"単勝: {b.team1}"
-            bets.append({'type': b.bet_type, 'label': label, 'amount': b.amount})
-        result.append({'name': p.name, 'bets': bets, 'has_bet': len(bets) > 0})
+        pred = None
+        if p.bets:
+            b = p.bets[0]
+            pred = {'team1': b.team1, 'team2': b.team2, 'team3': b.team3}
+        result.append({'name': p.name, 'prediction': pred})
     return jsonify(result)
 
 @app.route('/api/my-bet')
 def my_bet():
-    """自分の現在の賭け内容を返す"""
     if 'token' not in session:
-        return jsonify({'bets': []})
+        return jsonify({'prediction': None})
     p = Participant.query.filter_by(token=session['token']).first()
-    if not p:
-        return jsonify({'bets': []})
-    bets = []
-    for b in p.bets:
-        bets.append({
-            'type': b.bet_type,
-            'team1': b.team1, 'team2': b.team2, 'team3': b.team3,
-            'amount': b.amount
-        })
-    return jsonify({'name': p.name, 'bets': bets})
+    if not p or not p.bets:
+        return jsonify({'name': p.name if p else '', 'prediction': None})
+    b = p.bets[0]
+    return jsonify({
+        'name': p.name,
+        'prediction': {'team1': b.team1, 'team2': b.team2, 'team3': b.team3}
+    })
 
 @app.route('/api/bet', methods=['POST'])
 def place_bet():
@@ -467,63 +443,53 @@ def place_bet():
         return jsonify({'error': '参加者が見つかりません'}), 404
 
     data = request.json
-    buy_in = get_cfg('buy_in', 1000)
-    bets_data = data.get('bets', [])
+    buy_in = get_cfg('buy_in', 3000)
+    t1 = data.get('team1', '').strip()
+    t2 = data.get('team2', '').strip()
+    t3 = data.get('team3', '').strip()
 
-    # バリデーション：合計金額チェック
-    total = sum(int(b.get('amount', 0)) for b in bets_data)
-    if total != buy_in:
-        return jsonify({'error': f'掛け金の合計を {buy_in}円 にしてください（現在: {total}円）'}), 400
+    if not t1 or not t2 or not t3:
+        return jsonify({'error': '1位・2位・3位をすべて選択してください'}), 400
+    if len({t1, t2, t3}) < 3:
+        return jsonify({'error': '同じチームを複数選択できません'}), 400
 
-    # チーム重複チェック（3連単・3連複）
-    for b in bets_data:
-        teams = [b.get('team1'), b.get('team2'), b.get('team3')]
-        teams = [t for t in teams if t]
-        if len(teams) != len(set(teams)):
-            return jsonify({'error': '同じチームを複数選択できません'}), 400
-
-    # 既存の賭けを削除して置き換え
     Bet.query.filter_by(participant_id=p.id).delete()
-    for b in bets_data:
-        db.session.add(Bet(
-            participant_id=p.id,
-            bet_type=b['type'],
-            team1=b.get('team1'),
-            team2=b.get('team2'),
-            team3=b.get('team3'),
-            amount=int(b['amount']),
-        ))
+    db.session.add(Bet(
+        participant_id=p.id,
+        bet_type='prediction',
+        team1=t1, team2=t2, team3=t3,
+        amount=buy_in,
+    ))
     db.session.commit()
-    return jsonify({'ok': True, 'expected_payout': expected_payout(p)})
 
-@app.route('/api/odds')
-def get_odds():
-    pools, totals = calc_pools()
-    odd = odds_for(pools, totals)
+    sc = payout_scenarios(p)
+    return jsonify({'ok': True, 'scenarios': sc})
+
+@app.route('/api/stats')
+def get_stats():
+    """集計情報（参加者数・プール・予想分布）"""
+    total_pool, pred_count = calc_stats()
     participant_count = Participant.query.count()
     bet_count = Participant.query.join(Bet).distinct().count()
 
-    my_expected = None
+    my_scenarios = None
     if 'token' in session:
         p = Participant.query.filter_by(token=session['token']).first()
         if p:
-            my_expected = expected_payout(p)
+            my_scenarios = payout_scenarios(p)
 
-    # 各賭け種別の上位予想を集計
-    top = {}
-    for bt, pool in pools.items():
-        sorted_pool = sorted(pool.items(), key=lambda x: x[1], reverse=True)[:5]
-        top[bt] = [{'key': k, 'amount': v, 'odds': odd[bt].get(k, 0),
-                    'pct': round(v / totals[bt] * 100) if totals[bt] else 0}
-                   for k, v in sorted_pool]
+    # 人気予想TOP5
+    top_preds = sorted(pred_count.items(), key=lambda x: x[1], reverse=True)[:5]
+    top = [{'key': k.replace('|', ' → '), 'count': v,
+            'pct': round(v / bet_count * 100) if bet_count else 0}
+           for k, v in top_preds]
 
     return jsonify({
-        'totals': totals,
-        'total_pool': sum(totals.values()),
+        'total_pool': total_pool,
         'participant_count': participant_count,
         'bet_count': bet_count,
-        'top': top,
-        'my_expected': my_expected,
+        'top_predictions': top,
+        'my_scenarios': my_scenarios,
     })
 
 @app.route('/admin', methods=['GET', 'POST'])
@@ -544,11 +510,6 @@ def admin():
             set_cfg('buy_in', int(request.form['buy_in']))
             set_cfg('admin_password', request.form['admin_password'])
             set_cfg('football_api_key', request.form.get('football_api_key', '').strip())
-            set_cfg('weights', {
-                'trifecta': int(request.form.get('w_trifecta', 3)),
-                'trio':     int(request.form.get('w_trio', 2)),
-                'win':      int(request.form.get('w_win', 1)),
-            })
             deadline_str = request.form.get('deadline', '').strip()
             if deadline_str:
                 dt = datetime.fromisoformat(deadline_str).replace(tzinfo=timezone.utc)
@@ -582,20 +543,22 @@ def admin():
         return render_template('admin_login.html')
 
     participants = Participant.query.order_by(Participant.joined_at).all()
-    pools, totals = calc_pools()
+    total_pool, _ = calc_stats()
     results = get_cfg('results')
-    payouts = final_payouts() if results else None
+    fp = final_payouts() if results else None
+    payouts = fp[0] if fp else None
+    pts_map = fp[1] if fp else None
     return render_template('admin.html',
         participants=participants,
-        buy_in=get_cfg('buy_in', 1000),
+        buy_in=get_cfg('buy_in', 3000),
         admin_password=get_cfg('admin_password', 'admin1234'),
         football_api_key=get_cfg('football_api_key', ''),
-        weights=get_weights(),
         deadline=get_cfg('deadline', ''),
         is_open=get_cfg('is_open', True),
-        totals=totals,
+        total_pool=total_pool,
         results=results,
         payouts=payouts,
+        pts_map=pts_map,
         teams=TEAMS,
     )
 
@@ -608,7 +571,7 @@ def admin_logout():
 with app.app_context():
     db.create_all()
     if not db.session.get(Config, 'buy_in'):
-        set_cfg('buy_in', 1000)
+        set_cfg('buy_in', 3000)
     if not db.session.get(Config, 'is_open'):
         set_cfg('is_open', True)
     if not db.session.get(Config, 'admin_password'):
