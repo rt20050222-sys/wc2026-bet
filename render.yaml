@@ -1,0 +1,18 @@
+services:
+  - type: web
+    name: wc2026-bet
+    runtime: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn app:app
+    envVars:
+      - key: SECRET_KEY
+        generateValue: true
+      - key: DATABASE_URL
+        fromDatabase:
+          name: wc2026-db
+          property: connectionString
+
+databases:
+  - name: wc2026-db
+    databaseName: wc2026
+    user: wc2026

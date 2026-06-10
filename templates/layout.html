@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>⚽ W杯2026 予想バトル</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+  tailwind.config = {
+    theme: { extend: { colors: {
+      wc: { green: '#006633', gold: '#FFD700', red: '#C8102E' }
+    }}}
+  }
+</script>
+<style>
+  body { background: linear-gradient(135deg, #0f172a 0%, #1e3a5f 100%); min-height: 100vh; }
+  .card { background: rgba(255,255,255,0.05); backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.1); }
+  .btn-primary { background: linear-gradient(135deg, #006633, #009933); }
+  .btn-primary:hover { background: linear-gradient(135deg, #004d26, #007326); }
+  .odds-badge { background: linear-gradient(135deg, #7c3aed, #4f46e5); }
+  .payout-badge { background: linear-gradient(135deg, #d97706, #f59e0b); }
+  select { background-color: #1e293b; color: white; border-color: #334155; }
+  select option { background-color: #1e293b; }
+  input[type=number] { background-color: #1e293b; color: white; border-color: #334155; }
+  .tab-active { border-bottom: 3px solid #FFD700; color: #FFD700; }
+</style>
+</head>
+<body class="text-white font-sans">
+
+<nav class="bg-black bg-opacity-40 border-b border-white border-opacity-10 px-4 py-3">
+  <div class="max-w-4xl mx-auto flex items-center justify-between">
+    <a href="/" class="text-xl font-bold">⚽ W杯2026 予想バトル</a>
+    <div class="flex gap-3 text-sm">
+      {% if participant %}
+      <span class="text-green-400 font-semibold">👤 {{ participant.name }}</span>
+      <a href="/logout" class="text-gray-400 hover:text-white">ログアウト</a>
+      {% endif %}
+      <a href="/admin" class="text-gray-500 hover:text-gray-300 text-xs">管理</a>
+    </div>
+  </div>
+</nav>
+
+<main class="max-w-4xl mx-auto px-4 py-6">
+  {% block content %}{% endblock %}
+</main>
+
+<footer class="text-center text-gray-600 text-xs py-4">
+  パリミュチュエル方式 — 胴元なし・完全公平分配
+</footer>
+
+</body>
+</html>

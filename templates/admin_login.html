@@ -1,0 +1,19 @@
+{% extends "layout.html" %}
+{% block content %}
+<div class="max-w-sm mx-auto mt-20">
+  <div class="card rounded-2xl p-8 text-center">
+    <div class="text-4xl mb-4">🔐</div>
+    <h2 class="text-xl font-bold mb-6">管理者ログイン</h2>
+    <form action="/admin" method="post" class="space-y-4">
+      <input type="hidden" name="action" value="login">
+      <input type="password" name="password" placeholder="管理者パスワード" required
+        class="w-full rounded-lg px-4 py-3 border border-gray-600 focus:border-green-500 outline-none text-white text-sm"
+        style="background:#1e293b;">
+      <button type="submit" class="btn-primary w-full py-3 rounded-lg font-bold">
+        ログイン
+      </button>
+    </form>
+    <a href="/" class="text-gray-500 text-sm mt-4 block hover:text-white">← トップに戻る</a>
+  </div>
+</div>
+{% endblock %}
