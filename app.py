@@ -96,43 +96,61 @@ WC_HISTORY = [
     (2022,"アルゼンチン","フランス","クロアチア"),
 ]
 
-def fetch_rakuten_odds():
-    """楽天WINNERから優勝オッズを取得（5分キャッシュ）"""
+def fetch_live_odds():
+    """The Odds API から W杯優勝オッズを取得（2時間キャッシュ）"""
     now = datetime.now(timezone.utc)
+    cache_minutes = 120  # 月500回制限なので2時間キャッシュ
     if (_odds_cache['data'] is not None and _odds_cache['updated'] and
-            now - _odds_cache['updated'] < timedelta(minutes=CACHE_MINUTES)):
+            now - _odds_cache['updated'] < timedelta(minutes=cache_minutes)):
         return _odds_cache['data']
+
+    api_key = get_cfg('odds_api_key', '')
+    if not api_key:
+        return _odds_cache.get('data')
+
     try:
-        # lotteryIdを動的取得
-        page_req = urllib.request.Request(
-            'https://winner.toto.rakuten.co.jp/competition/soccer/detail',
-            headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-                     'Accept-Language': 'ja'})
-        with urllib.request.urlopen(page_req, timeout=8) as res:
-            html = res.read().decode('utf-8', errors='replace')
-        import re as _re
-        ids = _re.findall(r'lotteryId["\s:=]+(\d+)', html)
-        # 優勝予想（チーム別オッズ）のlotteryIdは数字が小さい方
-        lottery_id = sorted(set(ids))[0] if ids else '9536'
+        url = (
+            'https://api.the-odds-api.com/v4/sports/soccer_fifa_world_cup/odds/'
+            f'?apiKey={api_key}&regions=eu&markets=outrights&oddsFormat=decimal'
+        )
+        req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
+        with urllib.request.urlopen(req, timeout=10) as res:
+            raw = json.loads(res.read())
 
-        api_req = urllib.request.Request(
-            f'https://winner.toto.rakuten.co.jp/api/odds/updateOdds?lotteryId={lottery_id}',
-            headers={'User-Agent': 'Mozilla/5.0',
-                     'Referer': 'https://winner.toto.rakuten.co.jp/'})
-        with urllib.request.urlopen(api_req, timeout=8) as res:
-            data = json.loads(res.read())
+        # 全ブックメーカーのオッズを平均して集計
+        team_odds = {}
+        team_count = {}
+        for event in raw:
+            for bm in event.get('bookmakers', []):
+                for market in bm.get('markets', []):
+                    if market.get('key') != 'outrights':
+                        continue
+                    for outcome in market.get('outcomes', []):
+                        name = outcome['name']
+                        price = float(outcome['price'])
+                        team_odds[name]  = team_odds.get(name, 0) + price
+                        team_count[name] = team_count.get(name, 0) + 1
 
-        selections = data.get('data', {}).get('selections', [])
-        updated_at = data.get('data', {}).get('oddsUpdateDatetime', '')
+        if not team_odds:
+            return _odds_cache.get('data')
+
+        odds_list = [
+            {'name': name,
+             'odds': round(team_odds[name] / team_count[name], 2),
+             'name_ja': TEAM_NAME_MAP.get(name, name)}
+            for name in team_odds
+        ]
+        odds_list.sort(key=lambda x: x['odds'])
+
         result = {
-            'odds': [{'name': s['selectionName'], 'odds': float(s['odds'])}
-                     for s in selections if s.get('selectionTeamId')],
-            'updated_at': updated_at,
+            'odds': odds_list,
+            'updated_at': now.isoformat(),
+            'source': 'The Odds API',
         }
         _odds_cache['data'] = result
         _odds_cache['updated'] = now
         return result
-    except Exception:
+    except Exception as e:
         return _odds_cache.get('data')
 
 def fetch_football_api(path):
@@ -539,7 +557,10 @@ def place_bet():
 
 @app.route('/api/rakuten-odds')
 def api_rakuten_odds():
-    data = fetch_rakuten_odds()
+    api_key = get_cfg('odds_api_key', '')
+    if not api_key:
+        return jsonify({'error': 'API_KEY_NOT_SET'})
+    data = fetch_live_odds()
     if not data:
         return jsonify({'error': 'FETCH_FAILED'})
     return jsonify(data)
@@ -688,6 +709,8 @@ def admin():
             set_cfg('buy_in', int(request.form['buy_in']))
             set_cfg('admin_password', request.form['admin_password'])
             set_cfg('football_api_key', request.form.get('football_api_key', '').strip())
+            set_cfg('odds_api_key', request.form.get('odds_api_key', '').strip())
+            _odds_cache['data'] = None  # キャッシュクリア
             set_cfg('points', {
                 'trifecta': int(request.form.get('pt_trifecta', 15)),
                 'trio':     int(request.form.get('pt_trio', 5)),
@@ -736,6 +759,7 @@ def admin():
         buy_in=get_cfg('buy_in', 3000),
         admin_password=get_cfg('admin_password', 'admin1234'),
         football_api_key=get_cfg('football_api_key', ''),
+        odds_api_key=get_cfg('odds_api_key', ''),
         points=get_points(),
         deadline=get_cfg('deadline', ''),
         is_open=get_cfg('is_open', True),
