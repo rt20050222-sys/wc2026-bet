@@ -15,27 +15,64 @@ app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:////home/rt20050222sys/wc2026_be
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db = SQLAlchemy(app)
 
-# ── チーム一覧（2026 W杯 48カ国・正式） ────────────────────────
-TEAMS = [
-    # CONMEBOL（南米 6）
-    "アルゼンチン", "ブラジル", "ウルグアイ", "コロンビア", "エクアドル", "パラグアイ",
-    # UEFA（欧州 16）
-    "フランス", "スペイン", "イングランド", "ドイツ", "ポルトガル",
-    "オランダ", "ベルギー", "クロアチア", "スイス", "オーストリア",
-    "チェコ", "スコットランド", "トルコ", "ノルウェー", "スウェーデン",
-    "ボスニア・ヘルツェゴビナ",
-    # CONCACAF（北中米カリブ 6）
-    "アメリカ", "メキシコ", "カナダ", "パナマ", "ハイチ", "キュラソー",
-    # AFC（アジア 9）
-    "日本", "韓国", "オーストラリア", "イラン", "サウジアラビア",
-    "ウズベキスタン", "イラク", "ヨルダン", "カタール",
-    # CAF（アフリカ 10）
-    "モロッコ", "セネガル", "コートジボワール", "エジプト",
-    "コンゴ民主共和国", "南アフリカ", "ガーナ", "アルジェリア",
-    "チュニジア", "カーボベルデ",
-    # OFC（オセアニア 1）
-    "ニュージーランド",
+# ── チーム一覧＆オッズ（添付資料に基づく48チーム） ──────────────
+# オッズ順に並べておく（予想フォームの表示順）
+TEAMS_WITH_ODDS = [
+    ("スペイン",         5.5),
+    ("フランス",         5.8),
+    ("イングランド",     8.0),
+    ("ポルトガル",       9.5),
+    ("アルゼンチン",    10.0),
+    ("ブラジル",        10.0),
+    ("ドイツ",          15.0),
+    ("オランダ",        23.0),
+    ("ベルギー",        29.0),
+    ("ノルウェー",      34.0),
+    ("コロンビア",      41.0),
+    ("モロッコ",        51.0),
+    ("クロアチア",      67.0),
+    ("アメリカ",        81.0),
+    ("日本",           101.0),
+    ("ウルグアイ",     101.0),
+    ("メキシコ",       126.0),
+    ("デンマーク",     126.0),
+    ("スイス",         151.0),
+    ("セネガル",       151.0),
+    ("オーストリア",   176.0),
+    ("エジプト",       201.0),
+    ("スウェーデン",   201.0),
+    ("セルビア",       251.0),
+    ("カナダ",         251.0),
+    ("ポーランド",     301.0),
+    ("韓国",           351.0),
+    ("オーストラリア", 501.0),
+    ("チュニジア",     501.0),
+    ("パラグアイ",     501.0),
+    ("コートジボワール", 501.0),
+    ("エクアドル",     501.0),
+    ("アルジェリア",   501.0),
+    ("ナイジェリア",   751.0),
+    ("カメルーン",     751.0),
+    ("ペルー",         751.0),
+    ("チリ",          1001.0),
+    ("コスタリカ",    1001.0),
+    ("ウェールズ",    1001.0),
+    ("ギリシャ",      1001.0),
+    ("スコットランド",1001.0),
+    ("イラン",        1001.0),
+    ("サウジアラビア",1501.0),
+    ("南アフリカ",    1501.0),
+    ("ニュージーランド",2001.0),
+    ("パナマ",        2001.0),
+    ("ホンジュラス",  2501.0),
+    ("キュラソー",    3001.0),
 ]
+
+TEAMS    = [t for t, _ in TEAMS_WITH_ODDS]
+ODDS_MAP = {t: o for t, o in TEAMS_WITH_ODDS}
+
+def get_team_odds(name):
+    return ODDS_MAP.get(name, 1.0)
 
 # football-data.org の英語名 → 日本語名マッピング
 TEAM_NAME_MAP = {
@@ -96,63 +133,12 @@ WC_HISTORY = [
     (2022,"アルゼンチン","フランス","クロアチア"),
 ]
 
-# ── 楽天WINNERオッズ（ハードコード・2026/06/11時点） ─────────────
-WC2026_ODDS = [
-    {"name": "フランス",             "odds": 3.1},
-    {"name": "スペイン",             "odds": 3.3},
-    {"name": "イングランド",         "odds": 5.1},
-    {"name": "ポルトガル",           "odds": 5.2},
-    {"name": "アルゼンチン",         "odds": 5.5},
-    {"name": "ブラジル",             "odds": 5.9},
-    {"name": "ドイツ",               "odds": 9.4},
-    {"name": "日本",                 "odds": 10.8},
-    {"name": "オランダ",             "odds": 11.1},
-    {"name": "ノルウェー",           "odds": 18.3},
-    {"name": "モロッコ",             "odds": 20.6},
-    {"name": "ベルギー",             "odds": 21.1},
-    {"name": "クロアチア",           "odds": 32.4},
-    {"name": "メキシコ",             "odds": 38.7},
-    {"name": "ウルグアイ",           "odds": 48.5},
-    {"name": "アメリカ",             "odds": 49.2},
-    {"name": "コロンビア",           "odds": 58.5},
-    {"name": "エクアドル",           "odds": 79.1},
-    {"name": "セネガル",             "odds": 109.6},
-    {"name": "スウェーデン",         "odds": 129.7},
-    {"name": "スイス",               "odds": 130.2},
-    {"name": "コートジボワール",     "odds": 132.3},
-    {"name": "トルコ",               "odds": 187.5},
-    {"name": "パラグアイ",           "odds": 260.7},
-    {"name": "カナダ",               "odds": 294.7},
-    {"name": "韓国",                 "odds": 381.1},
-    {"name": "イラン",               "odds": 402.5},
-    {"name": "エジプト",             "odds": 405.1},
-    {"name": "ガーナ",               "odds": 429.4},
-    {"name": "オーストリア",         "odds": 436.6},
-    {"name": "アルジェリア",         "odds": 442.6},
-    {"name": "チェコ",               "odds": 491.6},
-    {"name": "スコットランド",       "odds": 495.4},
-    {"name": "チュニジア",           "odds": 534.5},
-    {"name": "オーストラリア",       "odds": 550.5},
-    {"name": "ボスニア・ヘルツェゴビナ", "odds": 585.5},
-    {"name": "サウジアラビア",       "odds": 619.3},
-    {"name": "南アフリカ",           "odds": 628.4},
-    {"name": "ニュージーランド",     "odds": 727.8},
-    {"name": "コンゴ民主共和国",     "odds": 771.3},
-    {"name": "カタール",             "odds": 810.2},
-    {"name": "イラク",               "odds": 853.1},
-    {"name": "ウズベキスタン",       "odds": 894.6},
-    {"name": "ハイチ",               "odds": 900.8},
-    {"name": "パナマ",               "odds": 907.2},
-    {"name": "カーボベルデ",         "odds": 920.1},
-    {"name": "キュラソー",           "odds": 920.1},
-    {"name": "ヨルダン",             "odds": 926.7},
-]
-
 def fetch_live_odds():
+    """TEAMS_WITH_ODDS からオッズ一覧を返す"""
     return {
-        'odds': WC2026_ODDS,
+        'odds': [{'name': t, 'odds': o} for t, o in TEAMS_WITH_ODDS],
         'updated_at': '2026-06-11',
-        'source': '楽天WINNER',
+        'source': '参考オッズ',
     }
 
 def fetch_football_api(path):
@@ -251,28 +237,33 @@ def is_betting_open():
         return datetime.now(timezone.utc) < datetime.fromisoformat(deadline)
     return True
 
-def get_points():
-    """管理者設定のポイントを取得（デフォルト: 3連単=15, 3連複=5, チーム=1）"""
-    return get_cfg('points', {'trifecta': 15, 'trio': 5, 'team': 1})
-
 def score_prediction(b, r1, r2, r3):
     """
-    予想bに対してポイントを計算
-    3連単(順番通り)   → trifecta pt
-    3連複(3チーム正解・順不同) → trio pt
-    1〜2チーム正解   → team pt × 正解チーム数
-    ※ 3チーム全正解は3連複扱いのためチーム単位ではカウントしない
-    """
-    pts = get_points()
-    top3 = {r1, r2, r3}
-    my = [b.team1, b.team2, b.team3]
+    オッズ連動ポイント計算
 
+    3連単（順番通り完全一致）
+        → 1位オッズ × 2位オッズ × 3位オッズ  （掛け算）
+
+    3連複（3チーム全員正解・順不同）
+        → 1位オッズ + 2位オッズ + 3位オッズ  （足し算）
+
+    単勝（1〜2チームがトップ3に入った）
+        → 的中チームのオッズの合計            （足し算）
+        ※ 3チーム全員は3連複扱いのため除く
+    """
+    top3 = {r1, r2, r3}
+    my   = [b.team1, b.team2, b.team3]
+
+    # 3連単：完全一致
     if b.team1 == r1 and b.team2 == r2 and b.team3 == r3:
-        return pts['trifecta']              # 3連単
+        return get_team_odds(r1) * get_team_odds(r2) * get_team_odds(r3)
+
+    # 3連複：3チーム全員正解（順不同）
     if set(filter(None, my)) == top3:
-        return pts['trio']                  # 3連複（全3チーム正解・順不同）
-    hit = sum(1 for t in my if t and t in top3)
-    return hit * pts['team']               # 単勝（1〜2チーム正解）
+        return get_team_odds(r1) + get_team_odds(r2) + get_team_odds(r3)
+
+    # 単勝：1〜2チーム正解 → 的中チームのオッズ合計
+    return sum(get_team_odds(t) for t in my if t and t in top3)
 
 def calc_stats():
     """表示用：予想の集計・重複チェック用"""
@@ -286,7 +277,8 @@ def calc_stats():
 
 def payout_scenarios(participant):
     """
-    自分の予想に対して「もし3連単/3連複/N人が当たったら」の推定配当を返す
+    自分の予想のオッズから3連単/3連複/単勝それぞれの推定ポイントと
+    「自分だけ当たった場合」の最大配当を返す
     """
     if not participant.bets:
         return None
@@ -296,21 +288,21 @@ def payout_scenarios(participant):
     if total_pool == 0:
         return None
 
+    o1 = get_team_odds(b.team1)
+    o2 = get_team_odds(b.team2)
+    o3 = get_team_odds(b.team3)
+
+    pts_trifecta = round(o1 * o2 * o3, 1)
+    pts_trio     = round(o1 + o2 + o3, 1)
+
     # 同じ予想の人数
-    same_key = f"{b.team1}|{b.team2}|{b.team3}"
+    same_key   = f"{b.team1}|{b.team2}|{b.team3}"
     same_count = sum(1 for x in all_bets if f"{x.team1}|{x.team2}|{x.team3}" == same_key)
 
-    # 現時点の全員ポイント合計（仮に3連単が当たった場合）
-    scenarios = {}
-    for label, my_pts, others_pts in [
-        ('3連単的中（自分だけ）', 15, 0),
-        ('3連単的中（同予想全員）', 15, 15 * (same_count - 1)),
-        ('3連複的中（自分だけ）', 5, 0),
-    ]:
-        total_pts = my_pts + others_pts
-        if total_pts > 0:
-            scenarios[label] = round(my_pts / total_pts * total_pool)
-
+    scenarios = {
+        f'3連単的中 ({pts_trifecta}pt)': round(pts_trifecta / (pts_trifecta * same_count) * total_pool) if same_count else total_pool,
+        f'3連複的中 ({pts_trio}pt)': round(pts_trio / (pts_trio * same_count) * total_pool) if same_count else total_pool,
+    }
     return scenarios
 
 def final_payouts():

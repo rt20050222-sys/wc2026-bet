@@ -19,25 +19,31 @@
 
 <!-- ポイントルール説明 -->
 <div class="card rounded-2xl p-5 mb-6">
-  <h2 class="text-sm font-bold text-gray-400 mb-3">📋 ポイントルール</h2>
+  <h2 class="text-sm font-bold text-gray-400 mb-3">📋 ポイントルール（オッズ連動）</h2>
   <div class="grid grid-cols-3 gap-3 text-center">
     <div class="card rounded-xl p-3">
-      <div class="text-yellow-400 font-black text-2xl">15pt</div>
-      <div class="text-xs text-gray-300 mt-1 font-bold">3連単</div>
-      <div class="text-xs text-gray-500 mt-0.5">1位・2位・3位を順番通りに的中</div>
+      <div class="text-yellow-400 font-black text-lg">掛け算</div>
+      <div class="text-xs text-gray-300 mt-1 font-bold">🥇 3連単</div>
+      <div class="text-xs text-gray-500 mt-0.5">1位×2位×3位のオッズを掛ける</div>
+      <div class="text-yellow-600 text-xs mt-1 font-mono">例: 5.5×5.8×8.0<br>= 255.2pt</div>
     </div>
     <div class="card rounded-xl p-3">
-      <div class="text-blue-400 font-black text-2xl">5pt</div>
-      <div class="text-xs text-gray-300 mt-1 font-bold">3連複</div>
-      <div class="text-xs text-gray-500 mt-0.5">トップ3チームを順不同で的中</div>
+      <div class="text-blue-400 font-black text-lg">足し算</div>
+      <div class="text-xs text-gray-300 mt-1 font-bold">🎯 3連複</div>
+      <div class="text-xs text-gray-500 mt-0.5">3チームのオッズを足す（順不同）</div>
+      <div class="text-blue-600 text-xs mt-1 font-mono">例: 5.5+5.8+8.0<br>= 19.3pt</div>
     </div>
     <div class="card rounded-xl p-3">
-      <div class="text-gray-300 font-black text-2xl">1pt×</div>
-      <div class="text-xs text-gray-300 mt-1 font-bold">単勝（1〜2チーム）</div>
-      <div class="text-xs text-gray-500 mt-0.5">1〜2チームがトップ3に入った数分<br>※3チーム全員は3連複扱い</div>
+      <div class="text-gray-300 font-black text-lg">足し算</div>
+      <div class="text-xs text-gray-300 mt-1 font-bold">✅ 単勝（1〜2チーム）</div>
+      <div class="text-xs text-gray-500 mt-0.5">的中チームのオッズを合計</div>
+      <div class="text-gray-500 text-xs mt-1 font-mono">例: 日本101+仏5.8<br>= 106.8pt</div>
     </div>
   </div>
-  <div class="mt-3 text-xs text-gray-500 text-center">配当 = 自分のpt ÷ 全員のpt合計 × 総プール（{{ '{:,}'.format(buy_in) }}円 × 参加人数）</div>
+  <div class="mt-3 text-xs text-gray-500 text-center">
+    配当 = 自分のpt ÷ 全員のpt合計 × 総プール ／
+    <a href="/odds" class="text-blue-400 hover:underline">オッズ一覧はこちら →</a>
+  </div>
 </div>
 
 <!-- 統計バー -->
