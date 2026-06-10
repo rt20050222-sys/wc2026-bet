@@ -467,10 +467,11 @@ def place_bet():
 
 @app.route('/api/stats')
 def get_stats():
-    """集計情報（参加者数・プール・予想分布）"""
-    total_pool, pred_count = calc_stats()
+    """集計情報（参加者数・プール・3種別ランキング）"""
+    total_pool, _ = calc_stats()
     participant_count = Participant.query.count()
-    bet_count = Participant.query.join(Bet).distinct().count()
+    all_bets = Bet.query.all()
+    bet_count = len(all_bets)
 
     my_scenarios = None
     if 'token' in session:
@@ -478,17 +479,41 @@ def get_stats():
         if p:
             my_scenarios = payout_scenarios(p)
 
-    # 人気予想TOP5
-    top_preds = sorted(pred_count.items(), key=lambda x: x[1], reverse=True)[:5]
-    top = [{'key': k.replace('|', ' → '), 'count': v,
-            'pct': round(v / bet_count * 100) if bet_count else 0}
-           for k, v in top_preds]
+    # 3連単：完全一致（順番通り）
+    trifecta_count = {}
+    # 3連複：3チームの組み合わせ（順不同）
+    trio_count = {}
+    # 単勝：1位予想チーム
+    win_count = {}
+
+    for b in all_bets:
+        # 3連単
+        tri_key = f"{b.team1} → {b.team2} → {b.team3}"
+        trifecta_count[tri_key] = trifecta_count.get(tri_key, 0) + 1
+        # 3連複
+        trio_key = ' / '.join(sorted(filter(None, [b.team1, b.team2, b.team3])))
+        trio_count[trio_key] = trio_count.get(trio_key, 0) + 1
+        # 単勝
+        if b.team1:
+            win_count[b.team1] = win_count.get(b.team1, 0) + 1
+
+    def to_list(d):
+        return sorted(
+            [{'key': k, 'count': v,
+              'pct': round(v / bet_count * 100) if bet_count else 0}
+             for k, v in d.items()],
+            key=lambda x: x['count'], reverse=True
+        )
 
     return jsonify({
         'total_pool': total_pool,
         'participant_count': participant_count,
         'bet_count': bet_count,
-        'top_predictions': top,
+        'rankings': {
+            'trifecta': to_list(trifecta_count),
+            'trio':     to_list(trio_count),
+            'win':      to_list(win_count),
+        },
         'my_scenarios': my_scenarios,
     })
 
