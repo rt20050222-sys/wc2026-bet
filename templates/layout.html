@@ -36,22 +36,34 @@
   .page-layout {
     display: flex;
     gap: 1.25rem;
-    max-width: 1200px;
+    max-width: 1280px;
     margin: 0 auto;
     padding: 1.5rem 1rem;
     align-items: flex-start;
   }
-  .sidebar {
-    width: 280px;
+  .sidebar-left {
+    width: 260px;
+    flex-shrink: 0;
+    position: sticky;
+    top: 1rem;
+  }
+  .sidebar-right {
+    width: 240px;
     flex-shrink: 0;
     position: sticky;
     top: 1rem;
   }
   .main-content { flex: 1; min-width: 0; }
 
-  @media (max-width: 900px) {
+  /* タブレット：右サイドバーを隠す */
+  @media (max-width: 1100px) {
+    .sidebar-right { display: none; }
+  }
+  /* スマホ：両サイドバーを通常フロー */
+  @media (max-width: 750px) {
     .page-layout { flex-direction: column; }
-    .sidebar { width: 100%; position: static; }
+    .sidebar-left  { width: 100%; position: static; }
+    .sidebar-right { display: block; width: 100%; position: static; }
   }
 </style>
 </head>
@@ -74,7 +86,7 @@
 <div class="page-layout">
 
   <!-- ── 左サイドバー ── -->
-  <aside class="sidebar space-y-4">
+  <aside class="sidebar-left space-y-4">
 
     <!-- 楽天WINNERオッズ -->
     <div class="card rounded-2xl overflow-hidden">
@@ -109,6 +121,19 @@
   <main class="main-content">
     {% block content %}{% endblock %}
   </main>
+
+  <!-- ── 右サイドバー（今日の試合） ── -->
+  <aside class="sidebar-right space-y-3">
+    <div class="card rounded-2xl overflow-hidden">
+      <div class="bg-gradient-to-r from-red-900 to-red-800 px-3 py-2 flex items-center justify-between">
+        <span class="text-red-300 font-black text-xs">⚽ 今日の試合</span>
+        <span class="text-red-600 text-xs" id="today-match-updated">--</span>
+      </div>
+      <div class="p-2 space-y-1" id="today-matches-sidebar">
+        <div class="text-gray-500 text-xs text-center py-6">読み込み中...</div>
+      </div>
+    </div>
+  </aside>
 
 </div>
 
@@ -203,9 +228,84 @@ async function loadHistory() {
   }
 }
 
+// ── 今日の試合（右サイドバー） ────────────────────────────
+async function loadTodayMatches() {
+  const el = document.getElementById('today-matches-sidebar');
+  const updEl = document.getElementById('today-match-updated');
+  if (!el) return;
+
+  try {
+    const res = await fetch('/api/matches');
+    const d = await res.json();
+    if (d.error || !d.matches) throw new Error('no data');
+
+    // JSTで今日の日付
+    const jstNow = new Date(Date.now() + 9 * 3600 * 1000);
+    const today = jstNow.toISOString().slice(5, 10).replace('-', '/'); // MM/DD
+
+    const live     = d.matches.filter(m => m.status_raw === 'IN_PLAY' || m.status_raw === 'PAUSED');
+    const todayAll = d.matches.filter(m => m.kick_off_jst && m.kick_off_jst.startsWith(today));
+    const finished = d.matches.filter(m => m.status_raw === 'FINISHED')
+                               .slice(-5).reverse();
+    const upcoming = d.matches.filter(m => m.status_raw === 'TIMED' || m.status_raw === 'SCHEDULED')
+                               .slice(0, 5);
+
+    const show = live.length ? live :
+                 todayAll.length ? todayAll :
+                 [...finished.slice(0, 3), ...upcoming.slice(0, 3)];
+
+    if (!show.length) {
+      el.innerHTML = '<div class="text-gray-600 text-xs text-center py-4">試合情報なし</div>';
+      return;
+    }
+
+    el.innerHTML = show.map(m => {
+      const isLive = m.status_raw === 'IN_PLAY' || m.status_raw === 'PAUSED';
+      const isDone = m.status_raw === 'FINISHED';
+      const hasScore = m.home_score !== null && m.home_score !== undefined;
+
+      const homeWin = hasScore && m.home_score > m.away_score;
+      const awayWin = hasScore && m.away_score > m.home_score;
+
+      const statusHtml = isLive
+        ? `<span class="text-red-400 text-xs font-bold" style="animation:pulse 1.5s infinite">🔴</span>`
+        : isDone ? `<span class="text-gray-600 text-xs">終了</span>`
+        : `<span class="text-blue-400 text-xs">${m.kick_off_jst.split(' ')[1] || '--:--'}</span>`;
+
+      const scoreHtml = hasScore
+        ? `<span class="${homeWin ? 'text-yellow-400 font-black' : 'text-gray-300'}">${m.home_score}</span>
+           <span class="text-gray-600 mx-0.5">-</span>
+           <span class="${awayWin ? 'text-yellow-400 font-black' : 'text-gray-300'}">${m.away_score}</span>`
+        : `<span class="text-gray-600">vs</span>`;
+
+      // グループ表示
+      const group = m.group ? m.group.replace('GROUP_', 'G') : m.stage.slice(0,6);
+
+      return `<div class="card rounded-lg px-2 py-2 ${isLive ? 'border border-red-500 border-opacity-40' : ''}">
+        <div class="flex items-center justify-between mb-1">
+          <span class="text-gray-600 text-xs">${group}</span>
+          ${statusHtml}
+        </div>
+        <div class="flex items-center justify-between text-xs gap-1">
+          <span class="font-semibold text-right flex-1 leading-tight ${homeWin ? 'text-yellow-400' : 'text-gray-200'}" style="font-size:0.68rem">${m.home}</span>
+          <div class="flex items-center gap-0.5 shrink-0 font-bold text-sm">${scoreHtml}</div>
+          <span class="font-semibold text-left flex-1 leading-tight ${awayWin ? 'text-yellow-400' : 'text-gray-200'}" style="font-size:0.68rem">${m.away}</span>
+        </div>
+      </div>`;
+    }).join('');
+
+    if (updEl) updEl.textContent = new Date().toLocaleTimeString('ja-JP', {hour:'2-digit', minute:'2-digit'});
+
+  } catch(e) {
+    el.innerHTML = '<div class="text-gray-600 text-xs text-center py-4">APIキー未設定<br><a href="/admin" class="text-blue-400 text-xs">管理画面で設定</a></div>';
+  }
+}
+
 loadSidebarOdds();
 loadHistory();
+loadTodayMatches();
 setInterval(loadSidebarOdds, 5 * 60 * 1000);
+setInterval(loadTodayMatches, 5 * 60 * 1000);
 </script>
 </body>
 </html>
