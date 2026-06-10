@@ -9,11 +9,7 @@ from flask_sqlalchemy import SQLAlchemy
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'wc2026-please-change-in-prod')
 
-DATABASE_URL = os.environ.get('DATABASE_URL', 'sqlite:///bets.db')
-if DATABASE_URL.startswith('postgres://'):
-    DATABASE_URL = DATABASE_URL.replace('postgres://', 'postgresql://', 1)
-
-app.config['SQLALCHEMY_DATABASE_URI'] = DATABASE_URL
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:////home/rt20050222sys/wc2026_bet/bets.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db = SQLAlchemy(app)
 
