@@ -556,7 +556,7 @@ def odds_list():
         participant = Participant.query.filter_by(token=session['token']).first()
     return render_template('odds_list.html',
         participant=participant,
-        odds=WC2026_ODDS)
+        odds=[{'name': t, 'odds': o} for t, o in TEAMS_WITH_ODDS])
 
 @app.route('/api/rakuten-odds')
 def api_rakuten_odds():
@@ -581,7 +581,6 @@ def simulate():
 
     all_bets = Bet.query.all()
     total_pool = sum(b.amount for b in all_bets)
-    pts_cfg = get_points()
 
     # 各参加者のポイントと判定を計算
     results_list = []
@@ -593,19 +592,19 @@ def simulate():
             })
             continue
         b = p.bets[0]
-        pts = score_prediction(b, r1, r2, r3)
+        pts = round(score_prediction(b, r1, r2, r3), 1)
 
-        # 判定ラベル
+        # 判定ラベル（オッズ連動表示）
         top3 = {r1, r2, r3}
         my = [b.team1, b.team2, b.team3]
         if b.team1 == r1 and b.team2 == r2 and b.team3 == r3:
-            label = f'🥇 3連単 ({pts_cfg["trifecta"]}pt)'
+            label = f'🥇 3連単 ({pts}pt)'
         elif set(filter(None, my)) == top3:
-            label = f'🎯 3連複 ({pts_cfg["trio"]}pt)'
+            label = f'🎯 3連複 ({pts}pt)'
         else:
             hit = sum(1 for t in my if t and t in top3)
             if hit > 0:
-                label = f'✅ {hit}チーム的中 ({hit * pts_cfg["team"]}pt)'
+                label = f'✅ {hit}チーム的中 ({pts}pt)'
             else:
                 label = '❌ ハズレ (0pt)'
 
@@ -757,7 +756,6 @@ def admin():
         admin_password=get_cfg('admin_password', 'admin1234'),
         football_api_key=get_cfg('football_api_key', ''),
         odds_api_key=get_cfg('odds_api_key', ''),
-        points=get_points(),
         deadline=get_cfg('deadline', ''),
         is_open=get_cfg('is_open', True),
         total_pool=total_pool,
