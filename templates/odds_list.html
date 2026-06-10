@@ -1,0 +1,64 @@
+{% extends "layout.html" %}
+{% block content %}
+<div class="max-w-2xl">
+
+<div class="flex items-center justify-between mb-6">
+  <h1 class="text-2xl font-black">📊 優勝オッズ一覧</h1>
+  <span class="text-xs text-gray-500">楽天WINNER 2026/06/11時点</span>
+</div>
+
+<!-- 凡例 -->
+<div class="card rounded-xl p-4 mb-5 flex flex-wrap gap-3 text-xs">
+  <span class="flex items-center gap-1"><span class="w-3 h-3 rounded-full bg-yellow-400 inline-block"></span> 5倍以下（大本命）</span>
+  <span class="flex items-center gap-1"><span class="w-3 h-3 rounded-full bg-green-400 inline-block"></span> 〜15倍（優勝候補）</span>
+  <span class="flex items-center gap-1"><span class="w-3 h-3 rounded-full bg-blue-400 inline-block"></span> 〜50倍（ダークホース）</span>
+  <span class="flex items-center gap-1"><span class="w-3 h-3 rounded-full bg-gray-500 inline-block"></span> 50倍超（穴）</span>
+</div>
+
+<!-- 全チームリスト -->
+<div class="space-y-1.5">
+  {% for item in odds %}
+  {% set o = item.odds %}
+  {% if o <= 5 %}
+    {% set bar_color = 'bg-yellow-400' %}
+    {% set text_color = 'text-yellow-400' %}
+    {% set border = 'border-yellow-500 border-opacity-40' %}
+  {% elif o <= 15 %}
+    {% set bar_color = 'bg-green-400' %}
+    {% set text_color = 'text-green-400' %}
+    {% set border = 'border-green-700 border-opacity-30' %}
+  {% elif o <= 50 %}
+    {% set bar_color = 'bg-blue-400' %}
+    {% set text_color = 'text-blue-400' %}
+    {% set border = 'border-gray-700' %}
+  {% else %}
+    {% set bar_color = 'bg-gray-600' %}
+    {% set text_color = 'text-gray-400' %}
+    {% set border = 'border-gray-800' %}
+  {% endif %}
+
+  <div class="card rounded-xl border {{ border }} px-4 py-2.5 flex items-center gap-3">
+    <!-- 順位 -->
+    <span class="text-gray-600 text-xs w-5 text-right shrink-0">{{ loop.index }}</span>
+
+    <!-- チーム名 -->
+    <span class="font-semibold flex-1 text-sm">{{ item.name }}</span>
+
+    <!-- バー -->
+    <div class="flex-1 max-w-32 hidden sm:block">
+      {% set max_odds = 926.7 %}
+      {% set bar_pct = [(100 - (o / max_odds * 90)) | round | int, 2] | max %}
+      <div class="h-1.5 rounded-full bg-gray-800 overflow-hidden">
+        <div class="{{ bar_color }} h-full rounded-full opacity-70" style="width:{{ bar_pct }}%"></div>
+      </div>
+    </div>
+
+    <!-- オッズ -->
+    <span class="font-black text-lg {{ text_color }} w-20 text-right shrink-0">{{ o }}倍</span>
+  </div>
+  {% endfor %}
+</div>
+
+<p class="text-xs text-gray-600 text-center mt-4">出典: 楽天WINNER スーパーtoto　※倍率は変動する場合があります</p>
+</div>
+{% endblock %}

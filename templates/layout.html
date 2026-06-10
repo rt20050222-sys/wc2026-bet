@@ -74,6 +74,7 @@
     <a href="/" class="text-xl font-bold">⚽ W杯2026 予想バトル</a>
     <div class="flex gap-3 items-center text-sm">
       <a href="/matches" class="text-gray-300 hover:text-white font-semibold">📺 速報</a>
+      <a href="/odds" class="text-gray-300 hover:text-white font-semibold">📊 オッズ</a>
       {% if participant %}
       <span class="text-green-400 font-semibold">👤 {{ participant.name }}</span>
       <a href="/logout" class="text-gray-400 hover:text-white">ログアウト</a>
@@ -101,7 +102,7 @@
         <div class="odds-scroll-wrap hidden" id="odds-scroll-wrap">
           <div class="odds-scroll-inner" id="odds-scroll-inner"></div>
         </div>
-        <p class="text-gray-700 text-xs text-center mt-1">楽天WINNER 優勝オッズ</p>
+        <a href="/odds" class="block text-center text-blue-400 text-xs mt-1 hover:underline">全48チームを見る →</a>
       </div>
     </div>
 
@@ -146,22 +147,12 @@
 async function loadSidebarOdds() {
   try {
     const res = await fetch('/api/rakuten-odds');
-    if (!res.ok) throw new Error('server error');
     const d = await res.json();
-    if (d.error || !d.odds || !d.odds.length) throw new Error('no data');
+    if (!d.odds || !d.odds.length) throw new Error('no data');
     renderOdds(d.odds, d.updated_at);
   } catch(e) {
-    // サーバー失敗 → クライアント直接取得を試みる
-    fetchOddsClientSide();
+    document.getElementById('odds-loading').textContent = '読み込み失敗';
   }
-}
-
-async function fetchOddsClientSide() {
-  document.getElementById('odds-loading').innerHTML =
-    '<div class="text-center py-4 text-xs text-gray-500">' +
-    '⚠️ オッズ未設定<br>' +
-    '<a href="/admin" class="text-blue-400 underline">管理画面</a>でThe Odds APIキーを登録してください' +
-    '</div>';
 }
 
 function renderOdds(odds, updatedAt) {

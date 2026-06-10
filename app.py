@@ -96,62 +96,64 @@ WC_HISTORY = [
     (2022,"アルゼンチン","フランス","クロアチア"),
 ]
 
+# ── 楽天WINNERオッズ（ハードコード・2026/06/11時点） ─────────────
+WC2026_ODDS = [
+    {"name": "フランス",             "odds": 3.1},
+    {"name": "スペイン",             "odds": 3.3},
+    {"name": "イングランド",         "odds": 5.1},
+    {"name": "ポルトガル",           "odds": 5.2},
+    {"name": "アルゼンチン",         "odds": 5.5},
+    {"name": "ブラジル",             "odds": 5.9},
+    {"name": "ドイツ",               "odds": 9.4},
+    {"name": "日本",                 "odds": 10.8},
+    {"name": "オランダ",             "odds": 11.1},
+    {"name": "ノルウェー",           "odds": 18.3},
+    {"name": "モロッコ",             "odds": 20.6},
+    {"name": "ベルギー",             "odds": 21.1},
+    {"name": "クロアチア",           "odds": 32.4},
+    {"name": "メキシコ",             "odds": 38.7},
+    {"name": "ウルグアイ",           "odds": 48.5},
+    {"name": "アメリカ",             "odds": 49.2},
+    {"name": "コロンビア",           "odds": 58.5},
+    {"name": "エクアドル",           "odds": 79.1},
+    {"name": "セネガル",             "odds": 109.6},
+    {"name": "スウェーデン",         "odds": 129.7},
+    {"name": "スイス",               "odds": 130.2},
+    {"name": "コートジボワール",     "odds": 132.3},
+    {"name": "トルコ",               "odds": 187.5},
+    {"name": "パラグアイ",           "odds": 260.7},
+    {"name": "カナダ",               "odds": 294.7},
+    {"name": "韓国",                 "odds": 381.1},
+    {"name": "イラン",               "odds": 402.5},
+    {"name": "エジプト",             "odds": 405.1},
+    {"name": "ガーナ",               "odds": 429.4},
+    {"name": "オーストリア",         "odds": 436.6},
+    {"name": "アルジェリア",         "odds": 442.6},
+    {"name": "チェコ",               "odds": 491.6},
+    {"name": "スコットランド",       "odds": 495.4},
+    {"name": "チュニジア",           "odds": 534.5},
+    {"name": "オーストラリア",       "odds": 550.5},
+    {"name": "ボスニア・ヘルツェゴビナ", "odds": 585.5},
+    {"name": "サウジアラビア",       "odds": 619.3},
+    {"name": "南アフリカ",           "odds": 628.4},
+    {"name": "ニュージーランド",     "odds": 727.8},
+    {"name": "コンゴ民主共和国",     "odds": 771.3},
+    {"name": "カタール",             "odds": 810.2},
+    {"name": "イラク",               "odds": 853.1},
+    {"name": "ウズベキスタン",       "odds": 894.6},
+    {"name": "ハイチ",               "odds": 900.8},
+    {"name": "パナマ",               "odds": 907.2},
+    {"name": "カーボベルデ",         "odds": 920.1},
+    {"name": "キュラソー",           "odds": 920.1},
+    {"name": "ヨルダン",             "odds": 926.7},
+]
+
 def fetch_live_odds():
-    """The Odds API から W杯優勝オッズを取得（2時間キャッシュ）"""
-    now = datetime.now(timezone.utc)
-    cache_minutes = 120  # 月500回制限なので2時間キャッシュ
-    if (_odds_cache['data'] is not None and _odds_cache['updated'] and
-            now - _odds_cache['updated'] < timedelta(minutes=cache_minutes)):
-        return _odds_cache['data']
-
-    api_key = get_cfg('odds_api_key', '')
-    if not api_key:
-        return _odds_cache.get('data')
-
-    try:
-        url = (
-            'https://api.the-odds-api.com/v4/sports/soccer_fifa_world_cup/odds/'
-            f'?apiKey={api_key}&regions=eu&markets=outrights&oddsFormat=decimal'
-        )
-        req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
-        with urllib.request.urlopen(req, timeout=10) as res:
-            raw = json.loads(res.read())
-
-        # 全ブックメーカーのオッズを平均して集計
-        team_odds = {}
-        team_count = {}
-        for event in raw:
-            for bm in event.get('bookmakers', []):
-                for market in bm.get('markets', []):
-                    if market.get('key') != 'outrights':
-                        continue
-                    for outcome in market.get('outcomes', []):
-                        name = outcome['name']
-                        price = float(outcome['price'])
-                        team_odds[name]  = team_odds.get(name, 0) + price
-                        team_count[name] = team_count.get(name, 0) + 1
-
-        if not team_odds:
-            return _odds_cache.get('data')
-
-        odds_list = [
-            {'name': name,
-             'odds': round(team_odds[name] / team_count[name], 2),
-             'name_ja': TEAM_NAME_MAP.get(name, name)}
-            for name in team_odds
-        ]
-        odds_list.sort(key=lambda x: x['odds'])
-
-        result = {
-            'odds': odds_list,
-            'updated_at': now.isoformat(),
-            'source': 'The Odds API',
-        }
-        _odds_cache['data'] = result
-        _odds_cache['updated'] = now
-        return result
-    except Exception as e:
-        return _odds_cache.get('data')
+    return {
+        'odds': WC2026_ODDS,
+        'updated_at': '2026-06-11',
+        'source': '楽天WINNER',
+    }
 
 def fetch_football_api(path):
     api_key = get_cfg('football_api_key', '')
@@ -555,15 +557,18 @@ def place_bet():
     sc = payout_scenarios(p)
     return jsonify({'ok': True, 'scenarios': sc})
 
+@app.route('/odds')
+def odds_list():
+    participant = None
+    if 'token' in session:
+        participant = Participant.query.filter_by(token=session['token']).first()
+    return render_template('odds_list.html',
+        participant=participant,
+        odds=WC2026_ODDS)
+
 @app.route('/api/rakuten-odds')
 def api_rakuten_odds():
-    api_key = get_cfg('odds_api_key', '')
-    if not api_key:
-        return jsonify({'error': 'API_KEY_NOT_SET'})
-    data = fetch_live_odds()
-    if not data:
-        return jsonify({'error': 'FETCH_FAILED'})
-    return jsonify(data)
+    return jsonify(fetch_live_odds())
 
 @app.route('/api/wc-history')
 def api_wc_history():
