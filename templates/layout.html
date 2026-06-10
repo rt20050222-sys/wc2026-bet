@@ -27,6 +27,25 @@
 </head>
 <body class="text-white font-sans">
 
+<!-- 楽天オッズティッカー -->
+<div id="odds-ticker-bar" class="bg-black border-b border-yellow-900 border-opacity-50 py-1.5 overflow-hidden hidden">
+  <div class="flex items-center gap-3">
+    <span class="shrink-0 bg-yellow-600 text-black text-xs font-black px-2 py-0.5 ml-3 rounded">LIVE ODDS</span>
+    <div class="ticker-wrapper overflow-hidden flex-1">
+      <div id="odds-ticker-content" class="ticker-inner flex gap-8 text-sm whitespace-nowrap"></div>
+    </div>
+  </div>
+</div>
+<style>
+.ticker-wrapper { position: relative; }
+.ticker-inner { display: inline-flex; animation: ticker-scroll 60s linear infinite; }
+.ticker-inner:hover { animation-play-state: paused; }
+@keyframes ticker-scroll {
+  0%   { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+</style>
+
 <nav class="bg-black bg-opacity-40 border-b border-white border-opacity-10 px-4 py-3">
   <div class="max-w-4xl mx-auto flex items-center justify-between">
     <a href="/" class="text-xl font-bold">⚽ W杯2026 予想バトル</a>
@@ -49,5 +68,46 @@
   パリミュチュエル方式 — 胴元なし・完全公平分配
 </footer>
 
+<script>
+async function loadOddsTicker() {
+  try {
+    const res = await fetch('/api/rakuten-odds');
+    const d = await res.json();
+    if (!d.odds || !d.odds.length) return;
+
+    const bar = document.getElementById('odds-ticker-bar');
+    const content = document.getElementById('odds-ticker-content');
+    if (!bar || !content) return;
+
+    // オッズ順（低い=人気）でソート
+    const sorted = [...d.odds].sort((a, b) => a.odds - b.odds);
+
+    // 1セット分のHTML
+    const makeItems = () => sorted.map(item => {
+      const color = item.odds <= 5 ? 'text-yellow-400' :
+                    item.odds <= 15 ? 'text-green-400' :
+                    item.odds <= 50 ? 'text-blue-400' : 'text-gray-400';
+      return `<span class="flex items-center gap-1.5">
+        <span class="text-gray-300 font-medium">${item.name}</span>
+        <span class="${color} font-black">${item.odds}倍</span>
+        <span class="text-gray-700">|</span>
+      </span>`;
+    }).join('');
+
+    // 無限スクロールのため2セット分を並べる
+    content.innerHTML = makeItems() + makeItems();
+
+    // 幅に合わせてアニメーション速度を調整
+    const totalWidth = content.scrollWidth / 2;
+    const speed = Math.max(40, totalWidth / 8); // px/s
+    content.style.animationDuration = `${speed}s`;
+
+    bar.classList.remove('hidden');
+  } catch(e) { console.error('ticker error', e); }
+}
+
+loadOddsTicker();
+setInterval(loadOddsTicker, 5 * 60 * 1000);
+</script>
 </body>
 </html>

@@ -65,9 +65,75 @@ def team_ja(name):
     return TEAM_NAME_MAP.get(name, name)
 
 # ── 試合データキャッシュ ──────────────────────────────────────────
-_match_cache = {'data': None, 'updated': None}
+_match_cache    = {'data': None, 'updated': None}
 _standings_cache = {'data': None, 'updated': None}
+_odds_cache      = {'data': None, 'updated': None}
 CACHE_MINUTES = 5
+
+# ── 歴代W杯結果 ───────────────────────────────────────────────────
+WC_HISTORY = [
+    (1930,"ウルグアイ","アルゼンチン","アメリカ"),
+    (1934,"イタリア","チェコスロバキア","ドイツ"),
+    (1938,"イタリア","ハンガリー","ブラジル"),
+    (1950,"ウルグアイ","ブラジル","スウェーデン"),
+    (1954,"西ドイツ","ハンガリー","オーストリア"),
+    (1958,"ブラジル","スウェーデン","フランス"),
+    (1962,"ブラジル","チェコスロバキア","チリ"),
+    (1966,"イングランド","西ドイツ","ポルトガル"),
+    (1970,"ブラジル","イタリア","西ドイツ"),
+    (1974,"西ドイツ","オランダ","ポーランド"),
+    (1978,"アルゼンチン","オランダ","ブラジル"),
+    (1982,"イタリア","西ドイツ","ポーランド"),
+    (1986,"アルゼンチン","西ドイツ","フランス"),
+    (1990,"西ドイツ","アルゼンチン","イタリア"),
+    (1994,"ブラジル","イタリア","スウェーデン"),
+    (1998,"フランス","ブラジル","クロアチア"),
+    (2002,"ブラジル","ドイツ","トルコ"),
+    (2006,"イタリア","フランス","ドイツ"),
+    (2010,"スペイン","オランダ","ドイツ"),
+    (2014,"ドイツ","アルゼンチン","オランダ"),
+    (2018,"フランス","クロアチア","ベルギー"),
+    (2022,"アルゼンチン","フランス","クロアチア"),
+]
+
+def fetch_rakuten_odds():
+    """楽天WINNERから優勝オッズを取得（5分キャッシュ）"""
+    now = datetime.now(timezone.utc)
+    if (_odds_cache['data'] is not None and _odds_cache['updated'] and
+            now - _odds_cache['updated'] < timedelta(minutes=CACHE_MINUTES)):
+        return _odds_cache['data']
+    try:
+        # lotteryIdを動的取得
+        page_req = urllib.request.Request(
+            'https://winner.toto.rakuten.co.jp/competition/soccer/detail',
+            headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+                     'Accept-Language': 'ja'})
+        with urllib.request.urlopen(page_req, timeout=8) as res:
+            html = res.read().decode('utf-8', errors='replace')
+        import re as _re
+        ids = _re.findall(r'lotteryId["\s:=]+(\d+)', html)
+        # 優勝予想（チーム別オッズ）のlotteryIdは数字が小さい方
+        lottery_id = sorted(set(ids))[0] if ids else '9536'
+
+        api_req = urllib.request.Request(
+            f'https://winner.toto.rakuten.co.jp/api/odds/updateOdds?lotteryId={lottery_id}',
+            headers={'User-Agent': 'Mozilla/5.0',
+                     'Referer': 'https://winner.toto.rakuten.co.jp/'})
+        with urllib.request.urlopen(api_req, timeout=8) as res:
+            data = json.loads(res.read())
+
+        selections = data.get('data', {}).get('selections', [])
+        updated_at = data.get('data', {}).get('oddsUpdateDatetime', '')
+        result = {
+            'odds': [{'name': s['selectionName'], 'odds': float(s['odds'])}
+                     for s in selections if s.get('selectionTeamId')],
+            'updated_at': updated_at,
+        }
+        _odds_cache['data'] = result
+        _odds_cache['updated'] = now
+        return result
+    except Exception:
+        return _odds_cache.get('data')
 
 def fetch_football_api(path):
     api_key = get_cfg('football_api_key', '')
@@ -470,6 +536,18 @@ def place_bet():
 
     sc = payout_scenarios(p)
     return jsonify({'ok': True, 'scenarios': sc})
+
+@app.route('/api/rakuten-odds')
+def api_rakuten_odds():
+    data = fetch_rakuten_odds()
+    if not data:
+        return jsonify({'error': 'FETCH_FAILED'})
+    return jsonify(data)
+
+@app.route('/api/wc-history')
+def api_wc_history():
+    return jsonify([{'year': y, 'first': f, 'second': s, 'third': t}
+                    for y, f, s, t in WC_HISTORY])
 
 @app.route('/api/simulate', methods=['POST'])
 def simulate():
