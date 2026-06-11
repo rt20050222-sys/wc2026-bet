@@ -127,8 +127,10 @@
     {% block content %}{% endblock %}
   </main>
 
-  <!-- ── 右サイドバー（今日の試合） ── -->
+  <!-- ── 右サイドバー（今日の試合＋ニュース） ── -->
   <aside class="sidebar-right space-y-3">
+
+    <!-- 今日の試合 -->
     <div class="card rounded-2xl overflow-hidden">
       <div class="bg-gradient-to-r from-red-900 to-red-800 px-3 py-2 flex items-center justify-between">
         <span class="text-red-300 font-black text-xs">⚽ 今日の試合</span>
@@ -138,6 +140,18 @@
         <div class="text-gray-500 text-xs text-center py-6">読み込み中...</div>
       </div>
     </div>
+
+    <!-- W杯ニュース -->
+    <div class="card rounded-2xl overflow-hidden">
+      <div class="bg-gradient-to-r from-indigo-900 to-indigo-800 px-3 py-2 flex items-center justify-between">
+        <span class="text-indigo-300 font-black text-xs">📰 W杯最新ニュース</span>
+        <span class="text-indigo-700 text-xs" id="news-updated">--</span>
+      </div>
+      <div class="p-2 space-y-1" id="news-sidebar">
+        <div class="text-gray-500 text-xs text-center py-6">読み込み中...</div>
+      </div>
+    </div>
+
   </aside>
 
 </div>
@@ -321,9 +335,39 @@ function togglePCMode() {
 // ページ読み込み時に保存済み設定を復元
 applyPCMode(localStorage.getItem('pcMode') === '1');
 
+// ── W杯ニュース ───────────────────────────────────────────
+async function loadNews() {
+  const el = document.getElementById('news-sidebar');
+  const upd = document.getElementById('news-updated');
+  if (!el) return;
+  try {
+    const res = await fetch('/api/wc-news');
+    const d = await res.json();
+    if (!d.news || !d.news.length) throw new Error('no news');
+
+    el.innerHTML = d.news.map(n => `
+      <a href="${n.link}" target="_blank" rel="noopener"
+        class="block card rounded-lg px-2 py-2 hover:bg-white hover:bg-opacity-10 transition group">
+        <div class="text-xs font-medium text-gray-200 leading-tight group-hover:text-white line-clamp-3" style="-webkit-line-clamp:3;display:-webkit-box;-webkit-box-orient:vertical;overflow:hidden;">
+          ${n.title}
+        </div>
+        <div class="flex items-center justify-between mt-1">
+          <span class="text-indigo-400 text-xs truncate max-w-24">${n.source || ''}</span>
+          <span class="text-gray-600 text-xs shrink-0 ml-1">${n.pub || ''}</span>
+        </div>
+      </a>`).join('');
+
+    if (upd) upd.textContent = new Date().toLocaleTimeString('ja-JP', {hour:'2-digit', minute:'2-digit'});
+  } catch(e) {
+    if (el) el.innerHTML = '<div class="text-gray-600 text-xs text-center py-4">ニュース取得失敗</div>';
+  }
+}
+
 loadSidebarOdds();
 loadHistory();
 loadTodayMatches();
+loadNews();
+setInterval(loadNews, 30 * 60 * 1000);
 setInterval(loadSidebarOdds, 5 * 60 * 1000);
 setInterval(loadTodayMatches, 5 * 60 * 1000);
 </script>

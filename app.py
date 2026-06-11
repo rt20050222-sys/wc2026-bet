@@ -575,6 +575,70 @@ def odds_list():
 def api_rakuten_odds():
     return jsonify(fetch_live_odds())
 
+_news_cache = {'data': None, 'updated': None}
+
+@app.route('/api/wc-news')
+def api_wc_news():
+    """W杯ニュースをGoogleニュースRSSから取得（30分キャッシュ）"""
+    import xml.etree.ElementTree as ET
+    import re as _re
+
+    now = datetime.now(timezone.utc)
+    if (_news_cache['data'] is not None and _news_cache['updated'] and
+            now - _news_cache['updated'] < timedelta(minutes=30)):
+        return jsonify(_news_cache['data'])
+
+    try:
+        url = 'https://news.google.com/rss/search?q=ワールドカップ2026+サッカー&hl=ja&gl=JP&ceid=JP:ja'
+        req = urllib.request.Request(url, headers={
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+        })
+        with urllib.request.urlopen(req, timeout=8) as res:
+            xml_data = res.read().decode('utf-8', errors='replace')
+
+        root = ET.fromstring(xml_data)
+        channel = root.find('channel')
+        items = channel.findall('item') if channel else []
+
+        news = []
+        for item in items[:10]:
+            title = item.findtext('title', '')
+            link  = item.findtext('link', '')
+            pub   = item.findtext('pubDate', '')
+            src_el = item.find('source')
+            source = src_el.text if src_el is not None else ''
+
+            # Google NewsのリダイレクトURLをそのまま使う
+            # タイトルから「 - ソース名」部分を除去
+            clean_title = _re.sub(r'\s*[-–]\s*[^-–]+$', '', title).strip()
+
+            # 日時を日本語に変換
+            try:
+                from email.utils import parsedate_to_datetime
+                dt = parsedate_to_datetime(pub)
+                jst = dt + timedelta(hours=9)
+                pub_ja = jst.strftime('%m/%d %H:%M')
+            except Exception:
+                pub_ja = ''
+
+            if clean_title and link:
+                news.append({
+                    'title': clean_title,
+                    'link': link,
+                    'source': source,
+                    'pub': pub_ja,
+                })
+
+        result = {'news': news, 'updated_at': now.isoformat()}
+        _news_cache['data'] = result
+        _news_cache['updated'] = now
+        return jsonify(result)
+
+    except Exception as e:
+        if _news_cache['data']:
+            return jsonify(_news_cache['data'])
+        return jsonify({'error': str(e), 'news': []})
+
 @app.route('/api/wc-history')
 def api_wc_history():
     return jsonify([{'year': y, 'first': f, 'second': s, 'third': t}
