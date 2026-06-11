@@ -276,7 +276,10 @@ def score_prediction(b, r1, r2, r3):
 def calc_stats():
     """表示用：予想の集計・重複チェック用"""
     bets = Bet.query.all()
-    total_pool = sum(b.amount for b in bets)
+    buy_in = get_cfg('buy_in', 3000)
+    # 合計プール = 予想入力済み参加者数 × 現在の掛け金
+    bet_count = len(bets)
+    total_pool = bet_count * buy_in
     pred_count = {}
     for b in bets:
         key = f"{b.team1}|{b.team2}|{b.team3}"
@@ -325,7 +328,8 @@ def final_payouts():
     r1, r2, r3 = results['1st'], results['2nd'], results['3rd']
 
     all_bets = Bet.query.all()
-    total_pool = sum(b.amount for b in all_bets)
+    buy_in = get_cfg('buy_in', 3000)
+    total_pool = len(all_bets) * buy_in
 
     # 各参加者のポイント計算
     pts_map = {}
@@ -589,7 +593,8 @@ def simulate():
         return jsonify({'error': '同じチームを選択できません'}), 400
 
     all_bets = Bet.query.all()
-    total_pool = sum(b.amount for b in all_bets)
+    buy_in = get_cfg('buy_in', 3000)
+    total_pool = len(all_bets) * buy_in
 
     # 各参加者のポイントと判定を計算
     results_list = []
