@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1" id="viewport-meta">
 <title>⚽ W杯2026 予想バトル</title>
 <script src="https://cdn.tailwindcss.com"></script>
 <style>
@@ -79,6 +79,10 @@
       <span class="text-green-400 font-semibold">👤 {{ participant.name }}</span>
       <a href="/logout" class="text-gray-400 hover:text-white">ログアウト</a>
       {% endif %}
+      <button id="pc-mode-btn" onclick="togglePCMode()"
+        class="text-xs border border-gray-600 hover:border-gray-400 px-2 py-1 rounded text-gray-400 hover:text-white transition">
+        🖥 PC版
+      </button>
       <a href="/admin" class="text-gray-500 hover:text-gray-300 text-xs">管理</a>
     </div>
   </div>
@@ -291,6 +295,31 @@ async function loadTodayMatches() {
     el.innerHTML = '<div class="text-gray-600 text-xs text-center py-4">APIキー未設定<br><a href="/admin" class="text-blue-400 text-xs">管理画面で設定</a></div>';
   }
 }
+
+// ── PC版 / スマホ版 切り替え ──────────────────────────────
+function applyPCMode(on) {
+  const vm = document.getElementById('viewport-meta');
+  const btn = document.getElementById('pc-mode-btn');
+  if (on) {
+    vm.content = 'width=1280';
+    btn.textContent = '📱 スマホ版';
+    btn.title = 'スマホ表示に戻す';
+  } else {
+    vm.content = 'width=device-width, initial-scale=1';
+    btn.textContent = '🖥 PC版';
+    btn.title = 'PC版レイアウトで表示';
+  }
+}
+
+function togglePCMode() {
+  const current = localStorage.getItem('pcMode') === '1';
+  const next = !current;
+  localStorage.setItem('pcMode', next ? '1' : '0');
+  applyPCMode(next);
+}
+
+// ページ読み込み時に保存済み設定を復元
+applyPCMode(localStorage.getItem('pcMode') === '1');
 
 loadSidebarOdds();
 loadHistory();
