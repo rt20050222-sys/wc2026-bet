@@ -448,6 +448,12 @@ def api_standings():
 # ── ルート ────────────────────────────────────────────────────────
 @app.route('/')
 def index():
+    # アクセスカウント（ボット除外のため簡易チェック）
+    ua = request.headers.get('User-Agent', '')
+    if 'bot' not in ua.lower() and 'crawl' not in ua.lower():
+        count = get_cfg('page_views', 0)
+        set_cfg('page_views', count + 1)
+
     participant = None
     if 'token' in session:
         participant = Participant.query.filter_by(token=session['token']).first()
@@ -852,6 +858,7 @@ def admin():
         teams_with_odds=TEAMS_WITH_ODDS,
         is_open=get_cfg('is_open', True),
         total_pool=total_pool,
+        page_views=get_cfg('page_views', 0),
         results=results,
         payouts=payouts,
         pts_map=pts_map,

@@ -208,9 +208,19 @@
 <!-- プール状況 -->
 <div class="card rounded-2xl p-6">
   <h2 class="text-lg font-bold mb-4">📊 プール状況</h2>
-  <div class="text-center">
+  <div class="text-center mb-4">
     <div class="text-3xl font-black text-yellow-400">{{ '{:,}'.format(total_pool) }}円</div>
     <div class="text-sm text-gray-400 mt-1">総プール（{{ participants | length }}人 × {{ '{:,}'.format(buy_in) }}円）</div>
+  </div>
+  <div class="grid grid-cols-2 gap-3">
+    <div class="card rounded-xl p-3 text-center">
+      <div class="text-2xl font-black text-blue-400">{{ '{:,}'.format(page_views) }}</div>
+      <div class="text-xs text-gray-400 mt-1">📈 累計アクセス数</div>
+    </div>
+    <div class="card rounded-xl p-3 text-center">
+      <div class="text-2xl font-black text-green-400">{{ participants | selectattr('bets') | list | length }}</div>
+      <div class="text-xs text-gray-400 mt-1">✅ 予想入力済み</div>
+    </div>
   </div>
   <div class="mt-4 text-xs text-gray-500 text-center">
     ポイント: 3連単＝オッズ掛け算 / 3連複＝オッズ足し算 / 単勝＝的中チームオッズ合計

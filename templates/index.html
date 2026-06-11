@@ -398,23 +398,37 @@ function renderRanking(elId, items) {
     el.innerHTML = '<div class="text-gray-500 text-sm text-center py-4">まだ予想なし</div>';
     return;
   }
-  const top5 = items.slice(0, 5);
-  const rest = items.slice(5);
 
-  const rowHtml = (item, i) => `
+  // 同票数は同順位（標準順位）
+  const ranked = items.map((item, i) => {
+    const rank = items.filter(x => x.count > item.count).length + 1;
+    return { ...item, rank };
+  });
+
+  const top5 = ranked.slice(0, 5);
+  const rest = ranked.slice(5);
+
+  const rankLabel = (rank) => {
+    if (rank === 1) return '🥇';
+    if (rank === 2) return '🥈';
+    if (rank === 3) return '🥉';
+    return `<span class="text-gray-500 text-xs w-6 inline-block text-center">${rank}</span>`;
+  };
+
+  const rowHtml = (item) => `
     <div class="flex items-center justify-between card rounded-lg px-4 py-2">
-      <span class="font-medium">${MEDALS[i] || `<span class="text-gray-500 text-xs w-6 inline-block text-center">${i+1}</span>`} ${item.key}</span>
+      <span class="font-medium">${rankLabel(item.rank)} ${item.key}</span>
       <span class="text-xs text-gray-400">${item.count}人 <span class="text-gray-600">(${item.pct}%)</span></span>
     </div>`;
 
-  let html = top5.map((item, i) => rowHtml(item, i)).join('');
+  let html = top5.map(item => rowHtml(item)).join('');
 
   if (rest.length > 0) {
     const restId = elId + '-rest';
     const btnId = elId + '-more-btn';
     html += `
       <div id="${restId}" class="hidden space-y-2 mt-2">
-        ${rest.map((item, i) => rowHtml(item, i + 5)).join('')}
+        ${rest.map(item => rowHtml(item)).join('')}
       </div>
       <button id="${btnId}" onclick="toggleRest('${restId}','${btnId}',${rest.length})"
         class="mt-3 w-full text-xs text-gray-400 hover:text-white py-2 rounded-lg border border-dashed border-gray-700 hover:border-gray-500 transition">
