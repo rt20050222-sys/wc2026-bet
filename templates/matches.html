@@ -245,17 +245,143 @@ async function loadStandings() {
 }
 
 function renderKnockout() {
-  const knockoutStages = ['ラウンド32','ラウンド16','準々決勝','準決勝','3位決定戦','決勝'];
-  let html = '';
-  for (const stage of knockoutStages) {
-    const ms = allMatchesData.filter(m => m.stage === stage);
-    if (!ms.length) continue;
-    html += `<div class="mb-6">
-      <h3 class="text-sm font-bold text-yellow-400 mb-3">${stage}</h3>
-      <div class="space-y-2">${ms.map(matchCard).join('')}</div>
+  const r32 = allMatchesData.filter(m => m.stage === 'ラウンド32');
+  const r16 = allMatchesData.filter(m => m.stage === 'ラウンド16');
+  const qf  = allMatchesData.filter(m => m.stage === '準々決勝');
+  const sf  = allMatchesData.filter(m => m.stage === '準決勝');
+  const fin = allMatchesData.filter(m => m.stage === '決勝');
+  const tp  = allMatchesData.filter(m => m.stage === '3位決定戦');
+
+  const hasKnockout = r32.length || r16.length || qf.length || sf.length || fin.length;
+  if (!hasKnockout) {
+    document.getElementById('knockout-content').innerHTML =
+      '<div class="text-center text-gray-500 py-10">決勝トーナメントはグループステージ終了後に表示されます</div>';
+    return;
+  }
+
+  function winner(m) {
+    if (!m || m.home_score === null || m.home_score === undefined) return null;
+    if (m.home_score > m.away_score) return m.home;
+    if (m.away_score > m.home_score) return m.away;
+    return null;
+  }
+
+  function bracketMatch(m, opts = {}) {
+    if (!m) return `<div class="bracket-match bracket-tbd"><div class="bracket-team tbd">TBD</div><div class="bracket-vs">vs</div><div class="bracket-team tbd">TBD</div></div>`;
+    const w = winner(m);
+    const hasScore = m.home_score !== null && m.home_score !== undefined;
+    const isLive = m.status_raw === 'IN_PLAY' || m.status_raw === 'PAUSED';
+    const isDone = m.status_raw === 'FINISHED';
+    const time = m.kick_off_jst ? m.kick_off_jst.replace(/^.*?(\d+\/\d+)\s+(\d+:\d+).*$/, '$1 $2') : '';
+
+    const homeWin = w === m.home;
+    const awayWin = w === m.away;
+
+    const scoreStr = hasScore ? `${m.home_score}-${m.away_score}` : '';
+
+    return `<div class="bracket-match ${isLive ? 'bracket-live' : isDone ? 'bracket-done' : 'bracket-upcoming'}" title="${m.home} vs ${m.away}${time ? ' | ' + time : ''}">
+      ${isLive ? '<div class="bracket-live-dot">🔴</div>' : ''}
+      <div class="bracket-team ${homeWin ? 'winner' : awayWin ? 'loser' : ''}">${m.home || 'TBD'}</div>
+      <div class="bracket-score">${scoreStr || (time ? '<span class="bracket-time">' + time + '</span>' : 'vs')}</div>
+      <div class="bracket-team ${awayWin ? 'winner' : homeWin ? 'loser' : ''}">${m.away || 'TBD'}</div>
     </div>`;
   }
-  if (!html) html = '<div class="text-center text-gray-500 py-10">決勝トーナメントはグループステージ終了後に表示されます</div>';
+
+  // ブラケット用CSS
+  const style = `<style>
+  .bracket-wrap { overflow-x: auto; padding-bottom: 8px; }
+  .bracket-grid {
+    display: grid;
+    gap: 0;
+    min-width: 700px;
+  }
+  .bracket-col { display: flex; flex-direction: column; justify-content: space-around; gap: 0; }
+  .bracket-col-label { text-align: center; font-size: 0.65rem; font-weight: 700; color: #FFD700; padding: 4px 2px 6px; letter-spacing: 0.03em; }
+  .bracket-match {
+    background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 8px;
+    padding: 5px 7px;
+    margin: 3px 2px;
+    font-size: 0.68rem;
+    position: relative;
+    cursor: default;
+    transition: background 0.2s;
+  }
+  .bracket-match:hover { background: rgba(255,255,255,0.1); }
+  .bracket-match.bracket-live { border-color: rgba(239,68,68,0.6); }
+  .bracket-match.bracket-done { border-color: rgba(74,222,128,0.2); }
+  .bracket-match.bracket-tbd { opacity: 0.4; }
+  .bracket-team { padding: 2px 0; font-weight: 600; color: #d1d5db; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 90px; }
+  .bracket-team.winner { color: #FFD700; font-weight: 800; }
+  .bracket-team.loser  { color: #4b5563; }
+  .bracket-team.tbd    { color: #374151; font-style: italic; }
+  .bracket-score { text-align: center; font-size: 0.7rem; font-weight: 800; color: #9ca3af; padding: 1px 0; }
+  .bracket-time { font-size: 0.6rem; color: #60a5fa; font-weight: 600; }
+  .bracket-vs { text-align: center; color: #374151; font-size: 0.6rem; padding: 1px 0; }
+  .bracket-live-dot { position: absolute; top: 3px; right: 4px; font-size: 0.5rem; animation: pulse 1.5s infinite; }
+  .bracket-connector { display: flex; align-items: center; justify-content: center; }
+  .connector-line { width: 100%; height: 2px; background: linear-gradient(90deg, rgba(255,215,0,0.3), rgba(255,215,0,0.1)); border-radius: 1px; }
+  .bracket-final-wrap { display: flex; flex-direction: column; align-items: center; gap: 8px; }
+  .champion-box { background: linear-gradient(135deg, rgba(255,215,0,0.15), rgba(255,165,0,0.1)); border: 2px solid rgba(255,215,0,0.5); border-radius: 10px; padding: 8px 12px; text-align: center; font-size: 0.75rem; font-weight: 800; color: #FFD700; min-width: 100px; }
+  .stage-section { margin-bottom: 20px; }
+  .stage-label { font-size: 0.7rem; font-weight: 700; color: #FFD700; margin-bottom: 8px; padding-left: 2px; }
+  .matches-row { display: flex; flex-wrap: wrap; gap: 6px; }
+  .bracket-match-sm { min-width: 140px; flex: 1; }
+  </style>`;
+
+  // スマホ対応: ステージごと縦並び
+  let html = style + '<div class="bracket-wrap">';
+
+  // 各ラウンドをセクションとして縦に並べる
+  const stages = [
+    { label: 'ラウンド32', matches: r32 },
+    { label: 'ラウンド16', matches: r16 },
+    { label: '準々決勝',   matches: qf },
+    { label: '準決勝',     matches: sf },
+    { label: '3位決定戦',  matches: tp },
+    { label: '決勝',       matches: fin },
+  ];
+
+  for (const s of stages) {
+    if (!s.matches.length) continue;
+    html += `<div class="stage-section">
+      <div class="stage-label">🏆 ${s.label}</div>
+      <div class="matches-row">`;
+    for (const m of s.matches) {
+      const w = winner(m);
+      const hasScore = m.home_score !== null && m.home_score !== undefined;
+      const isLive = m.status_raw === 'IN_PLAY' || m.status_raw === 'PAUSED';
+      const isDone = m.status_raw === 'FINISHED';
+      const time = m.kick_off_jst ? m.kick_off_jst.replace(/^\S+\s(\S+).*$/, '$1') : '';
+      const date = m.kick_off_jst ? m.kick_off_jst.split(' ')[0] : '';
+      const homeWin = w === m.home;
+      const awayWin = w === m.away;
+      const scoreStr = hasScore ? `${m.home_score} - ${m.away_score}` : '';
+
+      html += `<div class="bracket-match bracket-match-sm ${isLive ? 'bracket-live' : isDone ? 'bracket-done' : 'bracket-upcoming'}">
+        ${isLive ? '<div class="bracket-live-dot">🔴</div>' : ''}
+        <div class="bracket-team ${homeWin ? 'winner' : awayWin ? 'loser' : ''}">${m.home || 'TBD'}</div>
+        <div class="bracket-score">${scoreStr || `<span class="bracket-time">${date} ${time}</span>`}</div>
+        <div class="bracket-team ${awayWin ? 'winner' : homeWin ? 'loser' : ''}">${m.away || 'TBD'}</div>
+      </div>`;
+    }
+    html += `</div></div>`;
+  }
+
+  // 決勝の優勝チーム表示
+  if (fin.length) {
+    const finalMatch = fin[0];
+    const champ = winner(finalMatch);
+    if (champ) {
+      html += `<div class="stage-section">
+        <div class="stage-label">🏆 優勝</div>
+        <div class="champion-box">🏆 ${champ}</div>
+      </div>`;
+    }
+  }
+
+  html += '</div>';
   document.getElementById('knockout-content').innerHTML = html;
 }
 
