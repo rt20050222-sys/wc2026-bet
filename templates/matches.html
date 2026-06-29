@@ -251,7 +251,10 @@ function renderKnockout() {
   const sf  = allMatchesData.filter(m => m.stage === '準決勝');
   const fin = allMatchesData.filter(m => m.stage === '決勝');
   const tp  = allMatchesData.filter(m => m.stage === '3位決定戦');
+  return renderKnockoutBracket(r32, r16, qf, sf, fin, tp);
+}
 
+function renderKnockoutBracket(r32, r16, qf, sf, fin, tp) {
   const hasKnockout = r32.length || r16.length || qf.length || sf.length || fin.length;
   if (!hasKnockout) {
     document.getElementById('knockout-content').innerHTML =
@@ -259,129 +262,167 @@ function renderKnockout() {
     return;
   }
 
-  function winner(m) {
+  function getWinner(m) {
     if (!m || m.home_score === null || m.home_score === undefined) return null;
     if (m.home_score > m.away_score) return m.home;
     if (m.away_score > m.home_score) return m.away;
     return null;
   }
 
-  function bracketMatch(m, opts = {}) {
-    if (!m) return `<div class="bracket-match bracket-tbd"><div class="bracket-team tbd">TBD</div><div class="bracket-vs">vs</div><div class="bracket-team tbd">TBD</div></div>`;
-    const w = winner(m);
+  function matchBox(m) {
+    if (!m) return `<div class="bm bm-tbd"><div class="bt tbd">-</div><div class="bs">vs</div><div class="bt tbd">-</div></div>`;
+    const w = getWinner(m);
     const hasScore = m.home_score !== null && m.home_score !== undefined;
     const isLive = m.status_raw === 'IN_PLAY' || m.status_raw === 'PAUSED';
     const isDone = m.status_raw === 'FINISHED';
-    const time = m.kick_off_jst ? m.kick_off_jst.replace(/^.*?(\d+\/\d+)\s+(\d+:\d+).*$/, '$1 $2') : '';
-
-    const homeWin = w === m.home;
-    const awayWin = w === m.away;
-
-    const scoreStr = hasScore ? `${m.home_score}-${m.away_score}` : '';
-
-    return `<div class="bracket-match ${isLive ? 'bracket-live' : isDone ? 'bracket-done' : 'bracket-upcoming'}" title="${m.home} vs ${m.away}${time ? ' | ' + time : ''}">
-      ${isLive ? '<div class="bracket-live-dot">🔴</div>' : ''}
-      <div class="bracket-team ${homeWin ? 'winner' : awayWin ? 'loser' : ''}">${m.home || 'TBD'}</div>
-      <div class="bracket-score">${scoreStr || (time ? '<span class="bracket-time">' + time + '</span>' : 'vs')}</div>
-      <div class="bracket-team ${awayWin ? 'winner' : homeWin ? 'loser' : ''}">${m.away || 'TBD'}</div>
+    const hw = w === m.home, aw = w === m.away;
+    const score = hasScore ? `${m.home_score}-${m.away_score}` : '';
+    const dt = m.kick_off_jst ? m.kick_off_jst.replace(/^(\S+)\s(\d+:\d+).*$/, '$1 $2') : '';
+    const cls = isLive ? 'bm-live' : isDone ? 'bm-done' : '';
+    return `<div class="bm ${cls}">
+      ${isLive ? '<span class="blive">🔴</span>' : ''}
+      <div class="bt ${hw?'bw':aw?'bl':''}">${m.home||'TBD'}</div>
+      <div class="bs">${score || `<span class="bdt">${dt}</span>`}</div>
+      <div class="bt ${aw?'bw':hw?'bl':''}">${m.away||'TBD'}</div>
     </div>`;
   }
 
-  // ブラケット用CSS
+  // 左16試合 右16試合に分割
+  const lR32=r32.slice(0,8),  rR32=r32.slice(8);
+  const lR16=r16.slice(0,4),  rR16=r16.slice(4);
+  const lQF =qf.slice(0,2),   rQF =qf.slice(2);
+  const lSF =sf.slice(0,1),   rSF =sf.slice(1);
+
+  // 各列をHTMLに変換（flexで均等配置）
+  function col(matches, count) {
+    const items = [];
+    for (let i = 0; i < count; i++) items.push(matches[i] || null);
+    return `<div class="bcol">${items.map(m => `<div class="bcell">${matchBox(m)}</div>`).join('')}</div>`;
+  }
+
+  // コネクタ線
+  function connector(pairs) {
+    let html = '<div class="bconn">';
+    for (let i = 0; i < pairs; i++) {
+      html += `<div class="bconn-pair"><div class="bconn-line top"></div><div class="bconn-mid"></div><div class="bconn-line bot"></div></div>`;
+    }
+    return html + '</div>';
+  }
+
+  const champ = fin.length ? getWinner(fin[0]) : null;
+
   const style = `<style>
-  .bracket-wrap { overflow-x: auto; padding-bottom: 8px; }
-  .bracket-grid {
-    display: grid;
-    gap: 0;
-    min-width: 700px;
-  }
-  .bracket-col { display: flex; flex-direction: column; justify-content: space-around; gap: 0; }
-  .bracket-col-label { text-align: center; font-size: 0.65rem; font-weight: 700; color: #FFD700; padding: 4px 2px 6px; letter-spacing: 0.03em; }
-  .bracket-match {
-    background: rgba(255,255,255,0.05);
-    border: 1px solid rgba(255,255,255,0.1);
-    border-radius: 8px;
-    padding: 5px 7px;
-    margin: 3px 2px;
-    font-size: 0.68rem;
+  .bwrap { overflow-x: auto; padding: 4px 0 12px; }
+  .bgrid { display: flex; align-items: stretch; min-width: 680px; gap: 0; }
+  .bcol { display: flex; flex-direction: column; justify-content: space-around; flex: 1; gap: 0; }
+  .bcell { display: flex; align-items: center; justify-content: center; flex: 1; padding: 3px 2px; }
+  .bm {
+    background: rgba(255,255,255,0.06);
+    border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 7px;
+    padding: 4px 6px;
+    font-size: 0.62rem;
     position: relative;
-    cursor: default;
-    transition: background 0.2s;
+    width: 100%;
+    min-width: 72px;
+    box-sizing: border-box;
   }
-  .bracket-match:hover { background: rgba(255,255,255,0.1); }
-  .bracket-match.bracket-live { border-color: rgba(239,68,68,0.6); }
-  .bracket-match.bracket-done { border-color: rgba(74,222,128,0.2); }
-  .bracket-match.bracket-tbd { opacity: 0.4; }
-  .bracket-team { padding: 2px 0; font-weight: 600; color: #d1d5db; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 90px; }
-  .bracket-team.winner { color: #FFD700; font-weight: 800; }
-  .bracket-team.loser  { color: #4b5563; }
-  .bracket-team.tbd    { color: #374151; font-style: italic; }
-  .bracket-score { text-align: center; font-size: 0.7rem; font-weight: 800; color: #9ca3af; padding: 1px 0; }
-  .bracket-time { font-size: 0.6rem; color: #60a5fa; font-weight: 600; }
-  .bracket-vs { text-align: center; color: #374151; font-size: 0.6rem; padding: 1px 0; }
-  .bracket-live-dot { position: absolute; top: 3px; right: 4px; font-size: 0.5rem; animation: pulse 1.5s infinite; }
-  .bracket-connector { display: flex; align-items: center; justify-content: center; }
-  .connector-line { width: 100%; height: 2px; background: linear-gradient(90deg, rgba(255,215,0,0.3), rgba(255,215,0,0.1)); border-radius: 1px; }
-  .bracket-final-wrap { display: flex; flex-direction: column; align-items: center; gap: 8px; }
-  .champion-box { background: linear-gradient(135deg, rgba(255,215,0,0.15), rgba(255,165,0,0.1)); border: 2px solid rgba(255,215,0,0.5); border-radius: 10px; padding: 8px 12px; text-align: center; font-size: 0.75rem; font-weight: 800; color: #FFD700; min-width: 100px; }
-  .stage-section { margin-bottom: 20px; }
-  .stage-label { font-size: 0.7rem; font-weight: 700; color: #FFD700; margin-bottom: 8px; padding-left: 2px; }
-  .matches-row { display: flex; flex-wrap: wrap; gap: 6px; }
-  .bracket-match-sm { min-width: 140px; flex: 1; }
+  .bm-live { border-color: rgba(239,68,68,0.7); background: rgba(239,68,68,0.05); }
+  .bm-done { border-color: rgba(74,222,128,0.25); }
+  .bm-tbd { opacity: 0.3; }
+  .bt { font-weight: 600; color: #d1d5db; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 80px; padding: 1px 0; }
+  .bw { color: #FFD700; font-weight: 800; }
+  .bl { color: #374151; }
+  .tbd { color: #374151; }
+  .bs { text-align: center; font-size: 0.65rem; font-weight: 700; color: #6b7280; padding: 1px 0; }
+  .bdt { font-size: 0.58rem; color: #60a5fa; }
+  .blive { position: absolute; top: 2px; right: 3px; font-size: 0.5rem; animation: pulse 1.5s infinite; }
+  /* コネクタ */
+  .bconn { display: flex; flex-direction: column; justify-content: space-around; width: 10px; flex-shrink: 0; }
+  .bconn-pair { display: flex; flex-direction: column; flex: 1; justify-content: center; }
+  .bconn-line { flex: 1; border-right: 1px solid rgba(255,215,0,0.25); }
+  .bconn-line.top { border-top: 1px solid rgba(255,215,0,0.25); border-bottom: none; }
+  .bconn-line.bot { border-bottom: 1px solid rgba(255,215,0,0.25); border-top: none; }
+  .bconn-mid { height: 1px; background: rgba(255,215,0,0.25); width: 10px; }
+  /* 中央 */
+  .bcenter { display: flex; flex-direction: column; align-items: center; justify-content: center; flex-shrink: 0; width: 90px; gap: 6px; }
+  .bfinal-label { font-size: 0.6rem; font-weight: 700; color: #FFD700; text-align: center; }
+  .bchamp { background: linear-gradient(135deg, rgba(255,215,0,0.2), rgba(255,165,0,0.1)); border: 2px solid rgba(255,215,0,0.6); border-radius: 8px; padding: 5px 8px; text-align: center; font-size: 0.7rem; font-weight: 800; color: #FFD700; }
+  /* 3位決定戦 */
+  .bthird { margin-top: 10px; padding-top: 8px; border-top: 1px solid rgba(255,255,255,0.08); }
+  .bthird-label { font-size: 0.65rem; color: #f97316; font-weight: 700; margin-bottom: 4px; }
+  /* ラベル行 */
+  .blabels { display: flex; min-width: 680px; margin-bottom: 4px; }
+  .blabel { flex: 1; text-align: center; font-size: 0.58rem; color: #4b5563; font-weight: 600; }
+  .blabel-center { width: 110px; flex-shrink: 0; text-align: center; font-size: 0.58rem; color: #FFD700; font-weight: 700; }
+  .bconn-space { width: 10px; flex-shrink: 0; }
   </style>`;
 
-  // スマホ対応: ステージごと縦並び
-  let html = style + '<div class="bracket-wrap">';
+  // ラウンドが存在するか判定してどのラウンドから始めるか
+  const startRound = r32.length ? 'r32' : r16.length ? 'r16' : qf.length ? 'qf' : sf.length ? 'sf' : 'fin';
 
-  // 各ラウンドをセクションとして縦に並べる
-  const stages = [
-    { label: 'ラウンド32', matches: r32 },
-    { label: 'ラウンド16', matches: r16 },
-    { label: '準々決勝',   matches: qf },
-    { label: '準決勝',     matches: sf },
-    { label: '3位決定戦',  matches: tp },
-    { label: '決勝',       matches: fin },
-  ];
+  let leftCols = '', rightCols = '';
+  let leftConn = '', rightConn = '';
 
-  for (const s of stages) {
-    if (!s.matches.length) continue;
-    html += `<div class="stage-section">
-      <div class="stage-label">🏆 ${s.label}</div>
-      <div class="matches-row">`;
-    for (const m of s.matches) {
-      const w = winner(m);
-      const hasScore = m.home_score !== null && m.home_score !== undefined;
-      const isLive = m.status_raw === 'IN_PLAY' || m.status_raw === 'PAUSED';
-      const isDone = m.status_raw === 'FINISHED';
-      const time = m.kick_off_jst ? m.kick_off_jst.replace(/^\S+\s(\S+).*$/, '$1') : '';
-      const date = m.kick_off_jst ? m.kick_off_jst.split(' ')[0] : '';
-      const homeWin = w === m.home;
-      const awayWin = w === m.away;
-      const scoreStr = hasScore ? `${m.home_score} - ${m.away_score}` : '';
-
-      html += `<div class="bracket-match bracket-match-sm ${isLive ? 'bracket-live' : isDone ? 'bracket-done' : 'bracket-upcoming'}">
-        ${isLive ? '<div class="bracket-live-dot">🔴</div>' : ''}
-        <div class="bracket-team ${homeWin ? 'winner' : awayWin ? 'loser' : ''}">${m.home || 'TBD'}</div>
-        <div class="bracket-score">${scoreStr || `<span class="bracket-time">${date} ${time}</span>`}</div>
-        <div class="bracket-team ${awayWin ? 'winner' : homeWin ? 'loser' : ''}">${m.away || 'TBD'}</div>
-      </div>`;
-    }
-    html += `</div></div>`;
+  if (startRound === 'r32') {
+    leftCols  += col(lR32, 8);
+    leftConn  += connector(4);
+    leftCols  += col(lR16, 4);
+    leftConn  += connector(2);
+    leftCols  += col(lQF, 2);
+    leftConn  += connector(1);
+    leftCols  += col(lSF, 1);
+    rightCols  = col(rSF, 1);
+    rightConn  = connector(1);
+    rightCols += col(rQF, 2);
+    rightConn += connector(2);
+    rightCols += col(rR16, 4);
+    rightConn += connector(4);
+    rightCols += col(rR32, 8);
+  } else if (startRound === 'r16') {
+    leftCols  += col(lR16, 4);
+    leftConn  += connector(2);
+    leftCols  += col(lQF, 2);
+    leftConn  += connector(1);
+    leftCols  += col(lSF, 1);
+    rightCols  = col(rSF, 1);
+    rightConn  = connector(1);
+    rightCols += col(rQF, 2);
+    rightConn += connector(2);
+    rightCols += col(rR16, 4);
+  } else if (startRound === 'qf') {
+    leftCols  += col(lQF, 2);
+    leftConn  += connector(1);
+    leftCols  += col(lSF, 1);
+    rightCols  = col(rSF, 1);
+    rightConn  = connector(1);
+    rightCols += col(rQF, 2);
+  } else {
+    leftCols  += col(lSF, 1);
+    rightCols  = col(rSF, 1);
   }
 
-  // 決勝の優勝チーム表示
-  if (fin.length) {
-    const finalMatch = fin[0];
-    const champ = winner(finalMatch);
-    if (champ) {
-      html += `<div class="stage-section">
-        <div class="stage-label">🏆 優勝</div>
-        <div class="champion-box">🏆 ${champ}</div>
-      </div>`;
-    }
-  }
+  // 決勝 & 優勝者
+  const finalHtml = `<div class="bcenter">
+    <div class="bfinal-label">決勝</div>
+    ${matchBox(fin[0] || null)}
+    ${champ ? `<div class="bchamp">🏆 ${champ}</div>` : ''}
+  </div>`;
 
-  html += '</div>';
+  // 3位決定戦
+  const thirdHtml = tp.length ? `<div class="bthird">
+    <div class="bthird-label">🥉 3位決定戦</div>
+    ${matchBox(tp[0])}
+  </div>` : '';
+
+  const html = style + `
+  <div class="bwrap">
+    <div class="bgrid">
+      ${leftCols}${leftConn}${finalHtml}${rightConn}${rightCols}
+    </div>
+    ${thirdHtml}
+  </div>`;
+
   document.getElementById('knockout-content').innerHTML = html;
 }
 
